@@ -3,27 +3,23 @@ import sqlite3
 import pandas as pd
 import hashlib
 from datetime import datetime
+import os
 
 # =========================
 # CONFIG
 # =========================
-st.set_page_config(
-    page_title="Duarte Gestão ERP",
-    page_icon="🏢",
-    layout="wide"
-)
+st.set_page_config(page_title="Controle de Despesas", layout="wide")
 
 # =========================
 # BANCO
 # =========================
-conn = sqlite3.connect("duarte.db", check_same_thread=False)
+conn = sqlite3.connect("sistema.db", check_same_thread=False)
 cursor = conn.cursor()
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS usuarios (
     username TEXT PRIMARY KEY,
-    senha TEXT,
-    perfil TEXT
+    senha TEXT
 )
 """)
 
@@ -32,41 +28,40 @@ CREATE TABLE IF NOT EXISTS gastos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     usuario TEXT,
     data TEXT,
-    tipo TEXT,
     descricao TEXT,
-    valor REAL
-)
-""")
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario TEXT,
-    acao TEXT,
-    data_hora TEXT
+    valor REAL,
+    arquivo TEXT,
+    status TEXT
 )
 """)
 
 conn.commit()
 
 # =========================
-# CRIPTOGRAFIA
+# CRIPTO
 # =========================
 def hash_senha(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
 
-def criar_usuarios():
-    usuarios = [
-        ("admin", hash_senha("1234"), "admin"),
-        ("financeiro", hash_senha("1234"), "financeiro"),
-        ("auditor", hash_senha("1234"), "auditor"),
-    ]
+# =========================
+# CADASTRO
+# =========================
+def cadastro():
+    st.title("📝 Criar Conta")
 
-    for u in usuarios:
-        cursor.execute("INSERT OR IGNORE INTO usuarios VALUES (?, ?, ?)", u)
-    conn.commit()
+    novo_user = st.text_input("Usuário")
+    nova_senha = st.text_input("Senha", type="password")
 
-criar_usuarios()
+    if st.button("Cadastrar"):
+        try:
+            cursor.execute(
+                "INSERT INTO usuarios VALUES (?, ?)",
+                (novo_user, hash_senha(nova_senha))
+            )
+            conn.commit()
+            st.success("Conta criada!")
+        except:
+            st.error("Usuário já existe")
 
 # =========================
 # LOGIN
@@ -75,7 +70,7 @@ if "logado" not in st.session_state:
     st.session_state.logado = False
 
 def login():
-    st.title("🔐 Duarte Gestão ERP")
+    st.title("🔐 Controle de Despesas")
 
     user = st.text_input("Usuário")
     senha = st.text_input("Senha", type="password")
@@ -87,24 +82,32 @@ def login():
         if result and result[1] == hash_senha(senha):
             st.session_state.logado = True
             st.session_state.user = user
-            st.session_state.perfil = result[2]
             st.rerun()
         else:
             st.error("Login inválido")
 
+# =========================
+# TELA INICIAL
+# =========================
 if not st.session_state.logado:
-    login()
+    opcao = st.radio("Escolha", ["Login", "Criar conta"])
+
+    if opcao == "Login":
+        login()
+    else:
+        cadastro()
+
     st.stop()
 
 # =========================
-# LOG
+# MENU
 # =========================
-def log(acao):
-    cursor.execute(
-        "INSERT INTO logs (usuario, acao, data_hora) VALUES (?, ?, ?)",
-        (st.session_state.user, acao, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    )
-    conn.commit()
+menu = st.sidebar.radio(
+    "Menu",
+    ["📊 Meus Gastos", "➕ Novo Gasto", "📁 Notas", "💰 Pagamentos"]
+)
+
+st.title(f"💼 Bem-vindo, {st.session_state.user}")
 
 # =========================
 # CARREGAR DADOS
@@ -112,134 +115,87 @@ def log(acao):
 df = pd.read_sql("SELECT * FROM gastos", conn)
 
 # =========================
-# UI
+# NOVO GASTO
 # =========================
-st.image("https://www.duartegestao.com.br/images/logo-duartegestao.png", width=180)
-st.title(f"💼 ERP Duarte Gestão - {st.session_state.perfil.upper()}")
-
-menu = st.sidebar.radio(
-    "Menu",
-    ["📊 Dashboard", "➕ Lançar", "✏️ Editar/Excluir", "📅 Análise", "📜 Logs"]
-)
-
-# =========================
-# DASHBOARD
-# =========================
-if menu == "📊 Dashboard":
-
-    total = df["valor"].sum() if not df.empty else 0
-
-    col1, col2 = st.columns(2)
-    col1.metric("💰 Total", f"R$ {total:,.2f}")
-    col2.metric("📦 Registros", len(df))
-
-    if not df.empty:
-        df["data"] = pd.to_datetime(df["data"], errors="coerce")
-        df["mes"] = df["data"].dt.to_period("M").astype(str)
-
-        grafico = df.groupby("mes")["valor"].sum()
-        st.line_chart(grafico)
-
-# =========================
-# LANÇAR
-# =========================
-elif menu == "➕ Lançar":
-
-    if st.session_state.perfil == "auditor":
-        st.warning("Sem permissão")
-        st.stop()
+if menu == "➕ Novo Gasto":
 
     data = st.date_input("Data")
-    tipo = st.selectbox("Categoria", ["Alimentação", "Transporte", "Material", "Outros"])
-    valor = st.number_input("Valor", min_value=0.0)
     descricao = st.text_input("Descrição")
+    valor = st.number_input("Valor", min_value=0.0)
+
+    arquivo = st.file_uploader("Nota Fiscal (PDF/Imagem)")
 
     if st.button("Salvar"):
+        nome_arquivo = None
+
+        if arquivo:
+            os.makedirs("uploads", exist_ok=True)
+            caminho = f"uploads/{arquivo.name}"
+
+            with open(caminho, "wb") as f:
+                f.write(arquivo.read())
+
+            nome_arquivo = caminho
+
         cursor.execute("""
-            INSERT INTO gastos (usuario, data, tipo, descricao, valor)
-            VALUES (?, ?, ?, ?, ?)
-        """, (st.session_state.user, str(data), tipo, descricao, valor))
+            INSERT INTO gastos (usuario, data, descricao, valor, arquivo, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            st.session_state.user,
+            str(data),
+            descricao,
+            valor,
+            nome_arquivo,
+            "PENDENTE"
+        ))
+
         conn.commit()
-
-        log("NOVO GASTO")
-        st.success("Salvo!")
-        st.rerun()
+        st.success("Gasto enviado!")
 
 # =========================
-# EDITAR / EXCLUIR
+# MEUS GASTOS
 # =========================
-elif menu == "✏️ Editar/Excluir":
+elif menu == "📊 Meus Gastos":
 
-    if df.empty:
-        st.warning("Sem dados")
-        st.stop()
+    meus = df[df["usuario"] == st.session_state.user]
+
+    st.dataframe(meus, use_container_width=True)
+
+# =========================
+# NOTAS
+# =========================
+elif menu == "📁 Notas":
+
+    notas = df[df["usuario"] == st.session_state.user]
+
+    for _, row in notas.iterrows():
+        st.write(f"{row['descricao']} - R$ {row['valor']}")
+
+        if row["arquivo"]:
+            st.download_button(
+                "📥 Baixar Nota",
+                open(row["arquivo"], "rb"),
+                file_name=row["arquivo"]
+            )
+
+# =========================
+# PAGAMENTOS (EMPRESA)
+# =========================
+elif menu == "💰 Pagamentos":
+
+    st.subheader("Controle da Empresa")
 
     st.dataframe(df, use_container_width=True)
 
-    if st.session_state.perfil == "auditor":
-        st.warning("Sem permissão")
-        st.stop()
+    id_pag = st.number_input("ID para marcar como pago", min_value=1)
 
-    rid = st.number_input("ID do registro", min_value=1)
+    if st.button("Marcar como PAGO"):
+        cursor.execute("""
+            UPDATE gastos
+            SET status='PAGO'
+            WHERE id=?
+        """, (id_pag,))
+        conn.commit()
 
-    registro = df[df["id"] == rid]
-
-    if not registro.empty:
-        registro = registro.iloc[0]
-
-        data = st.text_input("Data", registro["data"])
-        tipo = st.selectbox(
-            "Categoria",
-            ["Alimentação", "Transporte", "Material", "Outros"],
-            index=["Alimentação","Transporte","Material","Outros"].index(registro["tipo"])
-            if registro["tipo"] in ["Alimentação","Transporte","Material","Outros"] else 0
-        )
-        descricao = st.text_input("Descrição", registro["descricao"])
-        valor = st.number_input("Valor", value=float(registro["valor"]))
-
-        col1, col2 = st.columns(2)
-
-        if col1.button("Salvar alteração"):
-            cursor.execute("""
-                UPDATE gastos
-                SET data=?, tipo=?, descricao=?, valor=?
-                WHERE id=?
-            """, (data, tipo, descricao, valor, rid))
-            conn.commit()
-
-            log(f"EDITOU ID {rid}")
-            st.success("Atualizado!")
-            st.rerun()
-
-        if col2.button("Excluir"):
-            cursor.execute("DELETE FROM gastos WHERE id=?", (rid,))
-            conn.commit()
-
-            log(f"EXCLUIU ID {rid}")
-            st.warning("Removido!")
-            st.rerun()
-
-# =========================
-# ANÁLISE
-# =========================
-elif menu == "📅 Análise":
-
-    if not df.empty:
-        df["data"] = pd.to_datetime(df["data"], errors="coerce")
-
-        meses = df["data"].dt.to_period("M").astype(str).unique()
-
-        mes = st.selectbox("Mês", sorted(meses))
-
-        filtrado = df[df["data"].dt.to_period("M").astype(str) == mes]
-
-        st.dataframe(filtrado, use_container_width=True)
-        st.bar_chart(filtrado.groupby("tipo")["valor"].sum())
-
-# =========================
-# LOGS
-# =========================
-elif menu == "📜 Logs":
-
-    logs = pd.read_sql("SELECT * FROM logs ORDER BY id DESC", conn)
-    st.dataframe(logs, use_container_width=True)
+        st.success("Pagamento realizado!")
+        st.rerun()
