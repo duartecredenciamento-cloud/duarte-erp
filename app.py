@@ -9,7 +9,7 @@ from datetime import datetime
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# 🎨 ESTILO TOP
+# 🎨 ESTILO
 # =========================
 st.markdown("""
 <style>
@@ -23,11 +23,6 @@ body {
     border-radius:15px;
     margin-bottom:15px;
     box-shadow: 0 0 20px rgba(0,0,0,0.3);
-    animation: fadeIn 0.5s ease-in;
-}
-@keyframes fadeIn {
-    from {opacity:0; transform:translateY(10px);}
-    to {opacity:1; transform:translateY(0);}
 }
 .title {
     font-size:30px;
@@ -128,7 +123,7 @@ if "logado" not in st.session_state:
     st.session_state["logado"] = False
 
 # =========================
-# 🔐 LOGIN MODERNO
+# LOGIN
 # =========================
 if not st.session_state["logado"]:
 
@@ -140,11 +135,11 @@ if not st.session_state["logado"]:
     </div>
     """, unsafe_allow_html=True)
 
-    abas = st.tabs(["🔐 Login", "📝 Criar Conta"])
+    abas = st.tabs(["Login", "Criar Conta"])
 
     with abas[0]:
-        user = st.text_input("Usuário", key="login_user")
-        senha = st.text_input("Senha", type="password", key="login_senha")
+        user = st.text_input("Usuário")
+        senha = st.text_input("Senha", type="password")
 
         if st.button("Entrar"):
             r = login(user, senha)
@@ -157,8 +152,8 @@ if not st.session_state["logado"]:
                 st.error("Erro no login")
 
     with abas[1]:
-        u = st.text_input("Novo usuário", key="novo_user")
-        s = st.text_input("Nova senha", type="password", key="nova_senha")
+        u = st.text_input("Novo usuário")
+        s = st.text_input("Nova senha", type="password")
 
         if st.button("Criar Conta"):
             if criar_usuario(u, s):
@@ -169,7 +164,7 @@ if not st.session_state["logado"]:
     st.stop()
 
 # =========================
-# SIDEBAR COM LOGO
+# SIDEBAR
 # =========================
 st.sidebar.markdown("""
 <a href="https://www.duartegestao.com.br/index.html" target="_blank">
@@ -184,7 +179,7 @@ if st.sidebar.button("Sair"):
     st.rerun()
 
 # =========================
-# DASHBOARD TOP
+# DASHBOARD
 # =========================
 if menu == "Dashboard":
 
@@ -209,8 +204,6 @@ if menu == "Dashboard":
 # DESPESAS
 # =========================
 elif menu == "Despesas":
-
-    st.markdown('<div class="title">💳 Nova Despesa</div>', unsafe_allow_html=True)
 
     desc = st.text_input("Descrição")
     valor = st.number_input("Valor", min_value=0.0)
@@ -237,7 +230,7 @@ elif menu == "Despesas":
         st.success("Despesa enviada!")
 
 # =========================
-# REEMBOLSOS
+# REEMBOLSOS (CORRIGIDO)
 # =========================
 elif menu == "Reembolsos":
 
@@ -255,33 +248,27 @@ elif menu == "Reembolsos":
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
         st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
-
-st.write(f"📅 Criado: {row['data_criacao']}")
-st.write(f"✔ Aprovado: {row['data_aprovacao']}")
-st.write(f"💸 Pago: {row['data_pagamento']}")
-
-# 🔥 MOSTRAR ANEXOS
-if row["arquivos"]:
-    arquivos = row["arquivos"].split(",")
-
-    for arq in arquivos:
-        if os.path.exists(arq):
-
-            # 🖼️ IMAGEM
-            if arq.lower().endswith((".png", ".jpg", ".jpeg")):
-                st.image(arq, width=250)
-
-            # 📄 PDF
-            elif arq.lower().endswith(".pdf"):
-                with open(arq, "rb") as f:
-                    st.download_button(
-                        label="📄 Abrir PDF",
-                        data=f,
-                        file_name=os.path.basename(arq)
-                    )
         st.write(f"📅 Criado: {row['data_criacao']}")
         st.write(f"✔ Aprovado: {row['data_aprovacao']}")
         st.write(f"💸 Pago: {row['data_pagamento']}")
+
+        # 🔥 ANEXOS
+        if row["arquivos"]:
+            arquivos = row["arquivos"].split(",")
+
+            for arq in arquivos:
+                if os.path.exists(arq):
+
+                    if arq.lower().endswith((".png", ".jpg", ".jpeg")):
+                        st.image(arq, width=250)
+
+                    elif arq.lower().endswith(".pdf"):
+                        with open(arq, "rb") as f:
+                            st.download_button(
+                                "📄 Abrir PDF",
+                                f,
+                                file_name=os.path.basename(arq)
+                            )
 
         col1, col2, col3 = st.columns(3)
 
@@ -298,6 +285,9 @@ if row["arquivos"]:
                          (row['id'],))
 
         st.markdown('</div>', unsafe_allow_html=True)
+
+    conn.commit()
+    conn.close()
 
     conn.commit()
     conn.close()
