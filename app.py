@@ -235,10 +235,99 @@ elif menu == "Despesas":
 # =========================
 # REEMBOLSOS (ADMIN)
 # =========================
-elif menu == "Reembolsos":
+if not st.session_state.get("admin"):
+    st.error("Acesso restrito ao administrador")
+    st.stop()
+   # =========================
+# 🔐 LOGIN / CADASTRO / RESET
+# =========================
+if not st.session_state["logado"]:
 
-    if not st.session_state.get("admin"):
-        st.stop()
+    st.markdown("""
+    <style>
+    .login-box {
+        background: linear-gradient(145deg,#1e293b,#0f172a);
+        padding:30px;
+        border-radius:15px;
+        box-shadow:0 0 20px rgba(0,0,0,0.4);
+        animation: fadeIn 1s ease-in;
+    }
+    @keyframes fadeIn {
+        from {opacity:0;}
+        to {opacity:1;}
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # LOGO
+    st.markdown("""
+    <div style="text-align:center;">
+        <a href="https://www.duartegestao.com.br/index.html" target="_blank">
+            <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="220">
+        </a>
+    </div>
+    """, unsafe_allow_html=True)
+
+    aba = st.tabs(["🔐 Login", "📝 Criar Conta", "🔑 Esqueci Senha"])
+
+    # ================= LOGIN =================
+    with aba[0]:
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
+
+        user = st.text_input("Usuário")
+        senha = st.text_input("Senha", type="password")
+
+        if st.button("Entrar"):
+            result = login(user, senha)
+
+            if result:
+                st.session_state["logado"] = True
+                st.session_state["usuario"] = result[1]
+                st.session_state["admin"] = result[3]
+                st.rerun()
+            else:
+                st.error("Usuário ou senha inválidos")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # ================= CRIAR CONTA =================
+    with aba[1]:
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
+
+        novo_user = st.text_input("Novo usuário")
+        nova_senha = st.text_input("Nova senha", type="password")
+
+        if st.button("Criar Conta"):
+            criado = criar_usuario(novo_user, nova_senha, 0)
+
+            if criado:
+                st.success("Conta criada! Faça login.")
+            else:
+                st.error("Usuário já existe")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # ================= RESET SENHA =================
+    with aba[2]:
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
+
+        user_reset = st.text_input("Usuário para reset")
+        nova_senha_reset = st.text_input("Nova senha", type="password")
+
+        if st.button("Resetar Senha"):
+            conn = connect()
+            senha_hash = hash_senha(nova_senha_reset)
+
+            conn.execute("UPDATE usuarios SET senha=? WHERE usuario=?",
+                         (senha_hash.decode(), user_reset))
+            conn.commit()
+            conn.close()
+
+            st.success("Senha atualizada!")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.stop()
 
     st.markdown('<div class="title">💰 Reembolsos</div>', unsafe_allow_html=True)
 
