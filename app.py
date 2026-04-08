@@ -254,7 +254,31 @@ elif menu == "Reembolsos":
 
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        st.write(f"👤 {row['usuario']} | 💰 {row['valor']} | {row['status']}")
+        st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
+
+st.write(f"📅 Criado: {row['data_criacao']}")
+st.write(f"✔ Aprovado: {row['data_aprovacao']}")
+st.write(f"💸 Pago: {row['data_pagamento']}")
+
+# 🔥 MOSTRAR ANEXOS
+if row["arquivos"]:
+    arquivos = row["arquivos"].split(",")
+
+    for arq in arquivos:
+        if os.path.exists(arq):
+
+            # 🖼️ IMAGEM
+            if arq.lower().endswith((".png", ".jpg", ".jpeg")):
+                st.image(arq, width=250)
+
+            # 📄 PDF
+            elif arq.lower().endswith(".pdf"):
+                with open(arq, "rb") as f:
+                    st.download_button(
+                        label="📄 Abrir PDF",
+                        data=f,
+                        file_name=os.path.basename(arq)
+                    )
         st.write(f"📅 Criado: {row['data_criacao']}")
         st.write(f"✔ Aprovado: {row['data_aprovacao']}")
         st.write(f"💸 Pago: {row['data_pagamento']}")
