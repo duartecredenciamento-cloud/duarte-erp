@@ -1,20 +1,19 @@
-
 import streamlit as st
 import sqlite3
 import os
 import pandas as pd
 import plotly.express as px
 import bcrypt
-st.write("🔥 NOVA VERSÃO ATIVA 🔥")
+from datetime import datetime
+
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# 🎨 ESTILO
+# ESTILO
 # =========================
 st.markdown("""
 <style>
 body {background-color:#0f172a;color:#e2e8f0;}
-section[data-testid="stSidebar"] {background-color:#020617;}
 .card {
     background: linear-gradient(145deg,#1e293b,#0f172a);
     padding:20px;
@@ -62,7 +61,10 @@ def criar_tabelas():
         categoria TEXT,
         valor REAL,
         arquivos TEXT,
-        status TEXT DEFAULT 'PENDENTE'
+        status TEXT DEFAULT 'PENDENTE',
+        data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_aprovacao TIMESTAMP,
+        data_pagamento TIMESTAMP
     )
     """)
 
@@ -87,9 +89,8 @@ def login(user, senha):
     result = c.fetchone()
     conn.close()
 
-    if result:
-        if verificar_senha(senha, result[2].encode()):
-            return result
+    if result and verificar_senha(senha, result[2].encode()):
+        return result
     return None
 
 def criar_usuario(user, senha, admin):
@@ -107,48 +108,59 @@ def criar_usuario(user, senha, admin):
         conn.close()
 
 # =========================
-# 🔐 LOGIN
+# LOGIN / CADASTRO
 # =========================
 if not st.session_state["logado"]:
 
     st.markdown("""
     <div style="text-align:center;">
-        <a href="https://www.duartegestao.com.br/index.html" target="_blank">
-            <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="220">
-        </a>
+        <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="220">
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="title" style="text-align:center;">Sistema de Despesas</div>', unsafe_allow_html=True)
+    abas = st.tabs(["Login", "Criar Conta", "Reset Senha"])
 
-    col1, col2, col3 = st.columns([1,2,1])
-
-    with col2:
+    with abas[0]:
         user = st.text_input("Usuário")
         senha = st.text_input("Senha", type="password")
 
         if st.button("Entrar"):
-            result = login(user, senha)
-
-            if result:
+            r = login(user, senha)
+            if r:
                 st.session_state["logado"] = True
-                st.session_state["usuario"] = result[1]
-                st.session_state["admin"] = result[3]
+                st.session_state["usuario"] = r[1]
+                st.session_state["admin"] = r[3]
                 st.rerun()
             else:
-                st.error("Login inválido")
+                st.error("Erro no login")
+
+    with abas[1]:
+        u = st.text_input("Novo usuário")
+        s = st.text_input("Nova senha", type="password")
+
+        if st.button("Criar"):
+            if criar_usuario(u, s, 0):
+                st.success("Criado!")
+            else:
+                st.error("Usuário existe")
+
+    with abas[2]:
+        u = st.text_input("Usuário reset")
+        s = st.text_input("Nova senha", type="password")
+
+        if st.button("Resetar"):
+            conn = connect()
+            conn.execute("UPDATE usuarios SET senha=? WHERE usuario=?",
+                         (hash_senha(s).decode(), u))
+            conn.commit()
+            conn.close()
+            st.success("Senha atualizada")
 
     st.stop()
 
 # =========================
 # MENU
 # =========================
-st.sidebar.markdown("""
-<a href="https://www.duartegestao.com.br/index.html" target="_blank">
-    <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="180">
-</a>
-""", unsafe_allow_html=True)
-
 menu = st.sidebar.radio("Menu", ["Dashboard", "Despesas", "Reembolsos"])
 
 if st.sidebar.button("Sair"):
@@ -159,22 +171,13 @@ if st.sidebar.button("Sair"):
 # DASHBOARD
 # =========================
 if menu == "Dashboard":
-
-    st.markdown('<div class="title">📊 Dashboard</div>', unsafe_allow_html=True)
-
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
-    col1, col2 = st.columns(2)
-
-    total = df["valor"].sum() if not df.empty else 0
-
-    col1.metric("💰 Total", f"R$ {total:.2f}")
-    col2.metric("📄 Quantidade", len(df))
+    st.metric("Total", f"R$ {df['valor'].sum() if not df.empty else 0:.2f}")
 
     if not df.empty:
-        st.plotly_chart(px.pie(df, names="categoria", values="valor"), use_container_width=True)
-        st.plotly_chart(px.bar(df, x="usuario", y="valor"), use_container_width=True)
+        st.plotly_chart(px.pie(df, names="categoria", values="valor"))
 
     conn.close()
 
@@ -183,201 +186,70 @@ if menu == "Dashboard":
 # =========================
 elif menu == "Despesas":
 
-    tab1, tab2 = st.tabs(["Nova", "Minhas"])
+    desc = st.text_input("Descrição")
+    valor = st.number_input("Valor", min_value=0.0)
+    categoria = st.selectbox("Categoria", ["Alimentação", "Transporte", "Outros"])
+    arquivos = st.file_uploader("Nota", accept_multiple_files=True)
 
-    # NOVA
-    with tab1:
-        desc = st.text_input("Descrição")
-        categoria = st.selectbox("Categoria", ["Alimentação", "Transporte", "Hospedagem", "Outros"])
-        valor = st.number_input("Valor", min_value=0.0)
-        arquivos = st.file_uploader("Nota", accept_multiple_files=True)
+    if st.button("Enviar"):
+        lista = []
+        for arq in arquivos:
+            path = f"uploads/{arq.name}"
+            with open(path, "wb") as f:
+                f.write(arq.read())
+            lista.append(path)
 
-        if st.button("Salvar"):
-            lista = []
-
-            for arquivo in arquivos:
-                caminho = f"uploads/{arquivo.name}"
-                with open(caminho, "wb") as f:
-                    f.write(arquivo.read())
-                lista.append(caminho)
-
-            conn = connect()
-            conn.execute("""
-            INSERT INTO despesas (usuario, descricao, categoria, valor, arquivos)
-            VALUES (?, ?, ?, ?, ?)
-            """, (st.session_state["usuario"], desc, categoria, valor, ",".join(lista)))
-
-            conn.commit()
-            conn.close()
-
-            st.success("Despesa enviada!")
-
-    # MINHAS
-    with tab2:
         conn = connect()
-        df = pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'", conn)
+        conn.execute("""
+        INSERT INTO despesas (usuario, descricao, categoria, valor, arquivos)
+        VALUES (?, ?, ?, ?, ?)
+        """, (st.session_state["usuario"], desc, categoria, valor, ",".join(lista)))
 
-        st.dataframe(df)
-
-        for i, row in df.iterrows():
-            if row["arquivos"]:
-                arquivos = row["arquivos"].split(",")
-
-                for arq in arquivos:
-                    if os.path.exists(arq):
-                        if arq.lower().endswith((".png", ".jpg", ".jpeg")):
-                            st.image(arq, width=200)
-                        elif arq.lower().endswith(".pdf"):
-                            with open(arq, "rb") as f:
-                                st.download_button("Abrir PDF", f, file_name=os.path.basename(arq))
-
+        conn.commit()
         conn.close()
+
+        st.success("Enviado!")
 
 # =========================
 # REEMBOLSOS (ADMIN)
 # =========================
-if not st.session_state.get("admin"):
-    st.error("Acesso restrito ao administrador")
-    st.stop()
-   # =========================
-# 🔐 LOGIN / CADASTRO / RESET
-# =========================
-if not st.session_state["logado"]:
+elif menu == "Reembolsos":
 
-    st.markdown("""
-    <style>
-    .login-box {
-        background: linear-gradient(145deg,#1e293b,#0f172a);
-        padding:30px;
-        border-radius:15px;
-        box-shadow:0 0 20px rgba(0,0,0,0.4);
-        animation: fadeIn 1s ease-in;
-    }
-    @keyframes fadeIn {
-        from {opacity:0;}
-        to {opacity:1;}
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # LOGO
-    st.markdown("""
-    <div style="text-align:center;">
-        <a href="https://www.duartegestao.com.br/index.html" target="_blank">
-            <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="220">
-        </a>
-    </div>
-    """, unsafe_allow_html=True)
-
-    aba = st.tabs(["🔐 Login", "📝 Criar Conta", "🔑 Esqueci Senha"])
-
-    # ================= LOGIN =================
-    with aba[0]:
-        st.markdown('<div class="login-box">', unsafe_allow_html=True)
-
-        user = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
-
-        if st.button("Entrar"):
-            result = login(user, senha)
-
-            if result:
-                st.session_state["logado"] = True
-                st.session_state["usuario"] = result[1]
-                st.session_state["admin"] = result[3]
-                st.rerun()
-            else:
-                st.error("Usuário ou senha inválidos")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # ================= CRIAR CONTA =================
-    with aba[1]:
-        st.markdown('<div class="login-box">', unsafe_allow_html=True)
-
-        novo_user = st.text_input("Novo usuário")
-        nova_senha = st.text_input("Nova senha", type="password")
-
-        if st.button("Criar Conta"):
-            criado = criar_usuario(novo_user, nova_senha, 0)
-
-            if criado:
-                st.success("Conta criada! Faça login.")
-            else:
-                st.error("Usuário já existe")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # ================= RESET SENHA =================
-    with aba[2]:
-        st.markdown('<div class="login-box">', unsafe_allow_html=True)
-
-        user_reset = st.text_input("Usuário para reset")
-        nova_senha_reset = st.text_input("Nova senha", type="password")
-
-        if st.button("Resetar Senha"):
-            conn = connect()
-            senha_hash = hash_senha(nova_senha_reset)
-
-            conn.execute("UPDATE usuarios SET senha=? WHERE usuario=?",
-                         (senha_hash.decode(), user_reset))
-            conn.commit()
-            conn.close()
-
-            st.success("Senha atualizada!")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    st.stop()
-
-    st.markdown('<div class="title">💰 Reembolsos</div>', unsafe_allow_html=True)
+    if not st.session_state.get("admin"):
+        st.error("Apenas admin")
+        st.stop()
 
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
-    # FILTROS
-    col1, col2 = st.columns(2)
-
-    user_filtro = col1.selectbox("Funcionário", ["Todos"] + list(df["usuario"].unique()))
-    status_filtro = col2.selectbox("Status", ["Todos", "PENDENTE", "APROVADO", "PAGO", "REJEITADO"])
-
-    if user_filtro != "Todos":
-        df = df[df["usuario"] == user_filtro]
-
-    if status_filtro != "Todos":
-        df = df[df["status"] == status_filtro]
-
-    total = df["valor"].sum()
-
-    st.metric("Total filtrado", f"R$ {total:.2f}")
-
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
 
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
-
-        if row["arquivos"]:
-            arquivos = row["arquivos"].split(",")
-
-            for arq in arquivos:
-                if os.path.exists(arq):
-                    if arq.lower().endswith((".png", ".jpg", ".jpeg")):
-                        st.image(arq, width=200)
-                    elif arq.lower().endswith(".pdf"):
-                        with open(arq, "rb") as f:
-                            st.download_button("Abrir PDF", f, file_name=os.path.basename(arq))
+        st.write(f"👤 {row['usuario']} | 💰 {row['valor']} | {row['status']}")
+        st.write(f"📅 Criado: {row['data_criacao']}")
+        st.write(f"✔ Aprovado: {row['data_aprovacao']}")
+        st.write(f"💸 Pago: {row['data_pagamento']}")
 
         col1, col2, col3 = st.columns(3)
 
         if col1.button(f"Aprovar {row['id']}"):
-            conn.execute("UPDATE despesas SET status='APROVADO' WHERE id=?", (row['id'],))
+            conn.execute("""
+            UPDATE despesas SET status='APROVADO', data_aprovacao=?
+            WHERE id=?
+            """, (datetime.now(), row['id']))
 
         if col2.button(f"Pagar {row['id']}"):
-            conn.execute("UPDATE despesas SET status='PAGO' WHERE id=?", (row['id'],))
+            conn.execute("""
+            UPDATE despesas SET status='PAGO', data_pagamento=?
+            WHERE id=?
+            """, (datetime.now(), row['id']))
 
         if col3.button(f"Rejeitar {row['id']}"):
-            conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?", (row['id'],))
+            conn.execute("""
+            UPDATE despesas SET status='REJEITADO'
+            WHERE id=?
+            """, (row['id'],))
 
         st.markdown('</div>', unsafe_allow_html=True)
 
