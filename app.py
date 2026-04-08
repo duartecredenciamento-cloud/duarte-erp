@@ -9,6 +9,34 @@ from datetime import datetime
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
+# 🎨 ESTILO TOP
+# =========================
+st.markdown("""
+<style>
+body {
+    background: linear-gradient(135deg,#0f172a,#020617);
+    color: #e2e8f0;
+}
+.card {
+    background: linear-gradient(145deg,#1e293b,#0f172a);
+    padding:20px;
+    border-radius:15px;
+    margin-bottom:15px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    animation: fadeIn 0.5s ease-in;
+}
+@keyframes fadeIn {
+    from {opacity:0; transform:translateY(10px);}
+    to {opacity:1; transform:translateY(0);}
+}
+.title {
+    font-size:30px;
+    font-weight:bold;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# =========================
 # DB
 # =========================
 def connect():
@@ -49,7 +77,6 @@ def criar_tabelas():
 def criar_admin():
     conn = connect()
     c = conn.cursor()
-
     senha_hash = bcrypt.hashpw("123456".encode(), bcrypt.gensalt()).decode()
 
     try:
@@ -101,11 +128,19 @@ if "logado" not in st.session_state:
     st.session_state["logado"] = False
 
 # =========================
-# LOGIN
+# 🔐 LOGIN MODERNO
 # =========================
 if not st.session_state["logado"]:
 
-    abas = st.tabs(["Login", "Criar Conta"])
+    st.markdown("""
+    <div style="text-align:center;">
+        <a href="https://www.duartegestao.com.br/index.html" target="_blank">
+            <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="220">
+        </a>
+    </div>
+    """, unsafe_allow_html=True)
+
+    abas = st.tabs(["🔐 Login", "📝 Criar Conta"])
 
     with abas[0]:
         user = st.text_input("Usuário", key="login_user")
@@ -134,8 +169,14 @@ if not st.session_state["logado"]:
     st.stop()
 
 # =========================
-# MENU
+# SIDEBAR COM LOGO
 # =========================
+st.sidebar.markdown("""
+<a href="https://www.duartegestao.com.br/index.html" target="_blank">
+    <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="180">
+</a>
+""", unsafe_allow_html=True)
+
 menu = st.sidebar.radio("Menu", ["Dashboard", "Despesas", "Reembolsos"])
 
 if st.sidebar.button("Sair"):
@@ -143,13 +184,24 @@ if st.sidebar.button("Sair"):
     st.rerun()
 
 # =========================
-# DASHBOARD
+# DASHBOARD TOP
 # =========================
 if menu == "Dashboard":
+
+    st.markdown('<div class="title">📊 Dashboard</div>', unsafe_allow_html=True)
+
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
-    st.metric("Total", f"R$ {df['valor'].sum() if not df.empty else 0:.2f}")
+    total = df["valor"].sum() if not df.empty else 0
+
+    col1, col2 = st.columns(2)
+    col1.metric("💰 Total", f"R$ {total:.2f}")
+    col2.metric("📄 Quantidade", len(df))
+
+    if not df.empty:
+        st.plotly_chart(px.pie(df, names="categoria", values="valor"), use_container_width=True)
+        st.plotly_chart(px.bar(df, x="usuario", y="valor"), use_container_width=True)
 
     conn.close()
 
@@ -157,6 +209,8 @@ if menu == "Dashboard":
 # DESPESAS
 # =========================
 elif menu == "Despesas":
+
+    st.markdown('<div class="title">💳 Nova Despesa</div>', unsafe_allow_html=True)
 
     desc = st.text_input("Descrição")
     valor = st.number_input("Valor", min_value=0.0)
@@ -180,7 +234,7 @@ elif menu == "Despesas":
         conn.commit()
         conn.close()
 
-        st.success("Enviado!")
+        st.success("Despesa enviada!")
 
 # =========================
 # REEMBOLSOS
@@ -191,15 +245,19 @@ elif menu == "Reembolsos":
         st.error("Apenas admin")
         st.stop()
 
+    st.markdown('<div class="title">💰 Reembolsos</div>', unsafe_allow_html=True)
+
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
     for _, row in df.iterrows():
 
-        st.write(f"{row['usuario']} - R$ {row['valor']} - {row['status']}")
-        st.write(f"Criado: {row['data_criacao']}")
-        st.write(f"Aprovado: {row['data_aprovacao']}")
-        st.write(f"Pago: {row['data_pagamento']}")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+
+        st.write(f"👤 {row['usuario']} | 💰 {row['valor']} | {row['status']}")
+        st.write(f"📅 Criado: {row['data_criacao']}")
+        st.write(f"✔ Aprovado: {row['data_aprovacao']}")
+        st.write(f"💸 Pago: {row['data_pagamento']}")
 
         col1, col2, col3 = st.columns(3)
 
@@ -214,6 +272,8 @@ elif menu == "Reembolsos":
         if col3.button(f"Rejeitar {row['id']}"):
             conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?",
                          (row['id'],))
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     conn.commit()
     conn.close()
