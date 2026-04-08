@@ -9,31 +9,6 @@ from datetime import datetime
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# ESTILO
-# =========================
-st.markdown("""
-<style>
-body {background-color:#0f172a;color:#e2e8f0;}
-.card {
-    background: linear-gradient(145deg,#1e293b,#0f172a);
-    padding:20px;
-    border-radius:15px;
-    margin-bottom:15px;
-}
-.title {
-    font-size:30px;
-    font-weight:bold;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# =========================
-# SESSION
-# =========================
-if "logado" not in st.session_state:
-    st.session_state["logado"] = False
-
-# =========================
 # DB
 # =========================
 def connect():
@@ -71,16 +46,28 @@ def criar_tabelas():
     conn.commit()
     conn.close()
 
+def criar_admin():
+    conn = connect()
+    c = conn.cursor()
+
+    senha_hash = bcrypt.hashpw("123456".encode(), bcrypt.gensalt()).decode()
+
+    try:
+        c.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?)", ("admin", senha_hash, 1))
+        conn.commit()
+    except:
+        pass
+
+    conn.close()
+
 criar_tabelas()
+criar_admin()
 
 # =========================
 # AUTH
 # =========================
-def hash_senha(senha):
-    return bcrypt.hashpw(senha.encode(), bcrypt.gensalt())
-
 def verificar_senha(senha, hash):
-    return bcrypt.checkpw(senha.encode(), hash)
+    return bcrypt.checkpw(senha.encode(), hash.encode())
 
 def login(user, senha):
     conn = connect()
@@ -89,23 +76,17 @@ def login(user, senha):
     result = c.fetchone()
     conn.close()
 
-    if result and verificar_senha(senha, result[2].encode()):
-        
-        # 🔥 DEFINE SEU USUÁRIO COMO ADMIN
-        if result[1] == "erickteste":  # 👈 TROCA AQUI
-            return (result[0], result[1], result[2], 1)
-
+    if result and verificar_senha(senha, result[2]):
         return result
-
     return None
 
-def criar_usuario(user, senha, admin):
+def criar_usuario(user, senha):
     conn = connect()
     c = conn.cursor()
-    senha_hash = hash_senha(senha)
+    senha_hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
 
     try:
-        c.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?)", (user, senha_hash.decode(), admin))
+        c.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?)", (user, senha_hash, 0))
         conn.commit()
         return True
     except:
@@ -114,21 +95,21 @@ def criar_usuario(user, senha, admin):
         conn.close()
 
 # =========================
-# LOGIN / CADASTRO
+# SESSION
+# =========================
+if "logado" not in st.session_state:
+    st.session_state["logado"] = False
+
+# =========================
+# LOGIN
 # =========================
 if not st.session_state["logado"]:
 
-    st.markdown("""
-    <div style="text-align:center;">
-        <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="220">
-    </div>
-    """, unsafe_allow_html=True)
-
-    abas = st.tabs(["Login", "Criar Conta", "Reset Senha"])
+    abas = st.tabs(["Login", "Criar Conta"])
 
     with abas[0]:
-        user = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
+        user = st.text_input("Usuário", key="login_user")
+        senha = st.text_input("Senha", type="password", key="login_senha")
 
         if st.button("Entrar"):
             r = login(user, senha)
@@ -141,26 +122,14 @@ if not st.session_state["logado"]:
                 st.error("Erro no login")
 
     with abas[1]:
-        u = st.text_input("Novo usuário")
-        s = st.text_input("Nova senha", type="password")
+        u = st.text_input("Novo usuário", key="novo_user")
+        s = st.text_input("Nova senha", type="password", key="nova_senha")
 
-        if st.button("Criar"):
-            if criar_usuario(u, s, 0):
-                st.success("Criado!")
+        if st.button("Criar Conta"):
+            if criar_usuario(u, s):
+                st.success("Conta criada!")
             else:
-                st.error("Usuário existe")
-
-    with abas[2]:
-        u = st.text_input("Usuário reset")
-        s = st.text_input("Nova senha", type="password")
-
-        if st.button("Resetar"):
-            conn = connect()
-            conn.execute("UPDATE usuarios SET senha=? WHERE usuario=?",
-                         (hash_senha(s).decode(), u))
-            conn.commit()
-            conn.close()
-            st.success("Senha atualizada")
+                st.error("Usuário já existe")
 
     st.stop()
 
@@ -181,9 +150,6 @@ if menu == "Dashboard":
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
     st.metric("Total", f"R$ {df['valor'].sum() if not df.empty else 0:.2f}")
-
-    if not df.empty:
-        st.plotly_chart(px.pie(df, names="categoria", values="valor"))
 
     conn.close()
 
@@ -217,7 +183,7 @@ elif menu == "Despesas":
         st.success("Enviado!")
 
 # =========================
-# REEMBOLSOS (ADMIN)
+# REEMBOLSOS
 # =========================
 elif menu == "Reembolsos":
 
@@ -230,34 +196,24 @@ elif menu == "Reembolsos":
 
     for _, row in df.iterrows():
 
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-
-        st.write(f"👤 {row['usuario']} | 💰 {row['valor']} | {row['status']}")
-        st.write(f"📅 Criado: {row['data_criacao']}")
-        st.write(f"✔ Aprovado: {row['data_aprovacao']}")
-        st.write(f"💸 Pago: {row['data_pagamento']}")
+        st.write(f"{row['usuario']} - R$ {row['valor']} - {row['status']}")
+        st.write(f"Criado: {row['data_criacao']}")
+        st.write(f"Aprovado: {row['data_aprovacao']}")
+        st.write(f"Pago: {row['data_pagamento']}")
 
         col1, col2, col3 = st.columns(3)
 
         if col1.button(f"Aprovar {row['id']}"):
-            conn.execute("""
-            UPDATE despesas SET status='APROVADO', data_aprovacao=?
-            WHERE id=?
-            """, (datetime.now(), row['id']))
+            conn.execute("UPDATE despesas SET status='APROVADO', data_aprovacao=? WHERE id=?",
+                         (datetime.now(), row['id']))
 
         if col2.button(f"Pagar {row['id']}"):
-            conn.execute("""
-            UPDATE despesas SET status='PAGO', data_pagamento=?
-            WHERE id=?
-            """, (datetime.now(), row['id']))
+            conn.execute("UPDATE despesas SET status='PAGO', data_pagamento=? WHERE id=?",
+                         (datetime.now(), row['id']))
 
         if col3.button(f"Rejeitar {row['id']}"):
-            conn.execute("""
-            UPDATE despesas SET status='REJEITADO'
-            WHERE id=?
-            """, (row['id'],))
-
-        st.markdown('</div>', unsafe_allow_html=True)
+            conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?",
+                         (row['id'],))
 
     conn.commit()
     conn.close()
