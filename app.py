@@ -90,7 +90,13 @@ def login(user, senha):
     conn.close()
 
     if result and verificar_senha(senha, result[2].encode()):
+        
+        # 🔥 DEFINE SEU USUÁRIO COMO ADMIN
+        if result[1] == "erickteste":  # 👈 TROCA AQUI
+            return (result[0], result[1], result[2], 1)
+
         return result
+
     return None
 
 def criar_usuario(user, senha, admin):
