@@ -1,10 +1,11 @@
+
 import streamlit as st
 import sqlite3
 import os
 import pandas as pd
 import plotly.express as px
 import bcrypt
-
+st.write("🔥 NOVA VERSÃO ATIVA 🔥")
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
