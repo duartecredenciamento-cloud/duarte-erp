@@ -9,25 +9,19 @@ from datetime import datetime
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# 🎨 ESTILO SAAS
+# 🎨 ESTILO PREMIUM
 # =========================
 st.markdown("""
 <style>
-body {
-    background: linear-gradient(135deg,#0f172a,#020617);
-    color: #e2e8f0;
-}
+body {background: linear-gradient(135deg,#0f172a,#020617);color:#e2e8f0;}
 .card {
     background: linear-gradient(145deg,#1e293b,#0f172a);
     padding:20px;
     border-radius:15px;
     margin-bottom:15px;
-    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    box-shadow: 0 0 25px rgba(0,0,0,0.4);
 }
-.title {
-    font-size:28px;
-    font-weight:bold;
-}
+.title {font-size:30px;font-weight:bold;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -183,16 +177,16 @@ if st.sidebar.button("Sair"):
 # =========================
 if menu == "Dashboard":
 
-    st.markdown('<div class="title">📊 Dashboard</div>', unsafe_allow_html=True)
+    st.markdown('<div class="title">📊 Dashboard Executivo</div>', unsafe_allow_html=True)
 
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
-    total = df["valor"].sum() if not df.empty else 0
+    col1, col2, col3 = st.columns(3)
 
-    col1, col2 = st.columns(2)
-    col1.metric("💰 Total", f"R$ {total:.2f}")
-    col2.metric("📄 Quantidade", len(df))
+    col1.metric("💰 Total", f"R$ {df['valor'].sum() if not df.empty else 0:.2f}")
+    col2.metric("📄 Qtde", len(df))
+    col3.metric("📊 Média", f"R$ {df['valor'].mean() if not df.empty else 0:.2f}")
 
     if not df.empty:
         st.plotly_chart(px.pie(df, names="categoria", values="valor"), use_container_width=True)
@@ -201,38 +195,81 @@ if menu == "Dashboard":
     conn.close()
 
 # =========================
-# DESPESAS
+# DESPESAS (COM CONTROLE TOTAL)
 # =========================
 elif menu == "Despesas":
 
-    st.markdown('<div class="title">💳 Nova Despesa</div>', unsafe_allow_html=True)
+    conn = connect()
 
-    desc = st.text_input("Descrição")
-    valor = st.number_input("Valor", min_value=0.0)
-    categoria = st.selectbox("Categoria", ["Alimentação", "Transporte", "Outros"])
-    arquivos = st.file_uploader("Nota", accept_multiple_files=True)
+    tab1, tab2 = st.tabs(["Nova", "Minhas"])
 
-    if st.button("Enviar"):
-        lista = []
-        for arq in arquivos:
-            path = f"uploads/{arq.name}"
-            with open(path, "wb") as f:
-                f.write(arq.read())
-            lista.append(path)
+    with tab1:
+        desc = st.text_input("Descrição")
+        valor = st.number_input("Valor", min_value=0.0)
+        categoria = st.selectbox("Categoria", ["Alimentação", "Transporte", "Outros"])
+        arquivos = st.file_uploader("Nota", accept_multiple_files=True)
 
-        conn = connect()
-        conn.execute("""
-        INSERT INTO despesas (usuario, descricao, categoria, valor, arquivos)
-        VALUES (?, ?, ?, ?, ?)
-        """, (st.session_state["usuario"], desc, categoria, valor, ",".join(lista)))
+        if st.button("Enviar"):
+            lista = []
+            for arq in arquivos:
+                path = f"uploads/{arq.name}"
+                with open(path, "wb") as f:
+                    f.write(arq.read())
+                lista.append(path)
 
-        conn.commit()
-        conn.close()
+            conn.execute("""
+            INSERT INTO despesas (usuario, descricao, categoria, valor, arquivos)
+            VALUES (?, ?, ?, ?, ?)
+            """, (st.session_state["usuario"], desc, categoria, valor, ",".join(lista)))
 
-        st.success("Despesa enviada!")
+            conn.commit()
+            st.success("Enviado!")
+
+    with tab2:
+        busca = st.text_input("Buscar descrição")
+
+        df = pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'", conn)
+
+        if busca:
+            df = df[df["descricao"].str.contains(busca, case=False)]
+
+        for _, row in df.iterrows():
+
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+
+            st.write(f"💰 R$ {row['valor']} | {row['status']}")
+            st.write(row["descricao"])
+
+            if row["arquivos"]:
+                arquivos = row["arquivos"].split(",")
+
+                for i, arq in enumerate(arquivos):
+                    if os.path.exists(arq):
+                        if arq.endswith((".png",".jpg",".jpeg")):
+                            st.image(arq, width=200)
+                        elif arq.endswith(".pdf"):
+                            with open(arq,"rb") as f:
+                                st.download_button("PDF",f,file_name=os.path.basename(arq),
+                                                   key=f"user_pdf_{row['id']}_{i}")
+
+            novo_valor = st.number_input("Editar valor", value=float(row["valor"]), key=f"edit_{row['id']}")
+
+            if st.button("Salvar", key=f"save_{row['id']}"):
+                conn.execute("UPDATE despesas SET valor=? WHERE id=?", (novo_valor,row['id']))
+                conn.commit()
+                st.success("Atualizado")
+
+            if st.button("Excluir", key=f"del_{row['id']}"):
+                conn.execute("DELETE FROM despesas WHERE id=?", (row['id'],))
+                conn.commit()
+                st.rerun()
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    conn.close()
 
 # =========================
-# REEMBOLSOS TOP
+# REEMBOLSOS ADMIN
 # =========================
 elif menu == "Reembolsos":
 
@@ -240,64 +277,44 @@ elif menu == "Reembolsos":
         st.error("Apenas admin")
         st.stop()
 
-    st.markdown('<div class="title">💰 Gestão de Reembolsos</div>', unsafe_allow_html=True)
-
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
-    # 🔥 FILTROS
-    col1, col2, col3 = st.columns(3)
+    busca = st.text_input("Buscar funcionário")
 
-    user_filtro = col1.selectbox("Funcionário", ["Todos"] + list(df["usuario"].unique()))
-    status_filtro = col2.selectbox("Status", ["Todos", "PENDENTE", "APROVADO", "PAGO", "REJEITADO"])
-    data_filtro = col3.date_input("Data", value=None)
+    if busca:
+        df = df[df["usuario"].str.contains(busca, case=False)]
 
-    if user_filtro != "Todos":
-        df = df[df["usuario"] == user_filtro]
-
-    if status_filtro != "Todos":
-        df = df[df["status"] == status_filtro]
-
-    total = df["valor"].sum() if not df.empty else 0
-    st.metric("💰 Total filtrado", f"R$ {total:.2f}")
-
-    # 🔥 LISTAGEM
     for _, row in df.iterrows():
 
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
-        st.write(f"📅 Criado: {row['data_criacao']}")
-        st.write(f"✔ Aprovado: {row['data_aprovacao']}")
-        st.write(f"💸 Pago: {row['data_pagamento']}")
+        st.write(f"{row['usuario']} | R$ {row['valor']} | {row['status']}")
 
-        # 📎 ANEXOS
         if row["arquivos"]:
             arquivos = row["arquivos"].split(",")
 
-            for arq in arquivos:
+            for i, arq in enumerate(arquivos):
                 if os.path.exists(arq):
-
-                    if arq.lower().endswith((".png", ".jpg", ".jpeg")):
-                        st.image(arq, width=250)
-
-                    elif arq.lower().endswith(".pdf"):
-                        with open(arq, "rb") as f:
-                            st.download_button("📄 Baixar PDF", f, file_name=os.path.basename(arq))
+                    if arq.endswith((".png",".jpg",".jpeg")):
+                        st.image(arq, width=200)
+                    elif arq.endswith(".pdf"):
+                        with open(arq,"rb") as f:
+                            st.download_button("PDF",f,file_name=os.path.basename(arq),
+                                               key=f"admin_pdf_{row['id']}_{i}")
 
         col1, col2, col3 = st.columns(3)
 
-        if col1.button(f"Aprovar {row['id']}"):
+        if col1.button("Aprovar", key=f"ap_{row['id']}"):
             conn.execute("UPDATE despesas SET status='APROVADO', data_aprovacao=? WHERE id=?",
-                         (datetime.now(), row['id']))
+                         (datetime.now(),row['id']))
 
-        if col2.button(f"Pagar {row['id']}"):
+        if col2.button("Pagar", key=f"pg_{row['id']}"):
             conn.execute("UPDATE despesas SET status='PAGO', data_pagamento=? WHERE id=?",
-                         (datetime.now(), row['id']))
+                         (datetime.now(),row['id']))
 
-        if col3.button(f"Rejeitar {row['id']}"):
-            conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?",
-                         (row['id'],))
+        if col3.button("Rejeitar", key=f"rj_{row['id']}"):
+            conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?",(row['id'],))
 
         st.markdown('</div>', unsafe_allow_html=True)
 
