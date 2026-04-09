@@ -9,7 +9,7 @@ from datetime import datetime
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# 🎨 ESTILO PREMIUM
+# 🎨 ESTILO
 # =========================
 st.markdown("""
 <style>
@@ -177,25 +177,23 @@ if st.sidebar.button("Sair"):
 # =========================
 if menu == "Dashboard":
 
-    st.markdown('<div class="title">📊 Dashboard Executivo</div>', unsafe_allow_html=True)
-
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
-    col1, col2, col3 = st.columns(3)
+    st.markdown('<div class="title">📊 Dashboard</div>', unsafe_allow_html=True)
 
-    col1.metric("💰 Total", f"R$ {df['valor'].sum() if not df.empty else 0:.2f}")
-    col2.metric("📄 Qtde", len(df))
-    col3.metric("📊 Média", f"R$ {df['valor'].mean() if not df.empty else 0:.2f}")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total", f"R$ {df['valor'].sum() if not df.empty else 0:.2f}")
+    col2.metric("Qtde", len(df))
+    col3.metric("Média", f"R$ {df['valor'].mean() if not df.empty else 0:.2f}")
 
     if not df.empty:
-        st.plotly_chart(px.pie(df, names="categoria", values="valor"), use_container_width=True)
         st.plotly_chart(px.bar(df, x="usuario", y="valor"), use_container_width=True)
 
     conn.close()
 
 # =========================
-# DESPESAS (COM CONTROLE TOTAL)
+# DESPESAS
 # =========================
 elif menu == "Despesas":
 
@@ -226,38 +224,26 @@ elif menu == "Despesas":
             st.success("Enviado!")
 
     with tab2:
-        busca = st.text_input("Buscar descrição")
-
         df = pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'", conn)
-
-        if busca:
-            df = df[df["descricao"].str.contains(busca, case=False)]
 
         for _, row in df.iterrows():
 
             st.markdown('<div class="card">', unsafe_allow_html=True)
 
-            st.write(f"💰 R$ {row['valor']} | {row['status']}")
+            st.write(f"R$ {row['valor']} | {row['status']}")
             st.write(row["descricao"])
 
             if row["arquivos"]:
                 arquivos = row["arquivos"].split(",")
-
                 for i, arq in enumerate(arquivos):
                     if os.path.exists(arq):
                         if arq.endswith((".png",".jpg",".jpeg")):
-                            st.image(arq, width=200)
+                            st.image(arq)
                         elif arq.endswith(".pdf"):
-                            with open(arq,"rb") as f:
-                                st.download_button("PDF",f,file_name=os.path.basename(arq),
-                                                   key=f"user_pdf_{row['id']}_{i}")
-
-            novo_valor = st.number_input("Editar valor", value=float(row["valor"]), key=f"edit_{row['id']}")
-
-            if st.button("Salvar", key=f"save_{row['id']}"):
-                conn.execute("UPDATE despesas SET valor=? WHERE id=?", (novo_valor,row['id']))
-                conn.commit()
-                st.success("Atualizado")
+                            with open(arq, "rb") as f:
+                                st.download_button("PDF", f,
+                                    file_name=os.path.basename(arq),
+                                    key=f"user_pdf_{row['id']}_{i}")
 
             if st.button("Excluir", key=f"del_{row['id']}"):
                 conn.execute("DELETE FROM despesas WHERE id=?", (row['id'],))
@@ -269,7 +255,7 @@ elif menu == "Despesas":
     conn.close()
 
 # =========================
-# REEMBOLSOS ADMIN
+# REEMBOLSOS TOP
 # =========================
 elif menu == "Reembolsos":
 
@@ -280,10 +266,24 @@ elif menu == "Reembolsos":
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
-    busca = st.text_input("Buscar funcionário")
+    # 🔥 FILTROS COMPLETOS
+    col1, col2, col3 = st.columns(3)
 
-    if busca:
-        df = df[df["usuario"].str.contains(busca, case=False)]
+    user = col1.selectbox("Funcionário", ["Todos"] + list(df["usuario"].unique()))
+    status = col2.selectbox("Status", ["Todos","PENDENTE","APROVADO","PAGO","REJEITADO"])
+    periodo = col3.date_input("Período", [])
+
+    if user != "Todos":
+        df = df[df["usuario"] == user]
+
+    if status != "Todos":
+        df = df[df["status"] == status]
+
+    if len(periodo) == 2:
+        df["data_criacao"] = pd.to_datetime(df["data_criacao"])
+        df = df[(df["data_criacao"] >= str(periodo[0])) & (df["data_criacao"] <= str(periodo[1]))]
+
+    st.metric("Total filtrado", f"R$ {df['valor'].sum() if not df.empty else 0:.2f}")
 
     for _, row in df.iterrows():
 
@@ -291,29 +291,31 @@ elif menu == "Reembolsos":
 
         st.write(f"{row['usuario']} | R$ {row['valor']} | {row['status']}")
 
+        # 🔥 PREVIEW DIRETO
         if row["arquivos"]:
             arquivos = row["arquivos"].split(",")
 
-            for i, arq in enumerate(arquivos):
+            for arq in arquivos:
                 if os.path.exists(arq):
                     if arq.endswith((".png",".jpg",".jpeg")):
-                        st.image(arq, width=200)
+                        st.image(arq)
                     elif arq.endswith(".pdf"):
-                        with open(arq,"rb") as f:
-                            st.download_button("PDF",f,file_name=os.path.basename(arq),
-                                               key=f"admin_pdf_{row['id']}_{i}")
+                        with open(arq, "rb") as f:
+                            st.download_button("Abrir PDF", f,
+                                file_name=os.path.basename(arq),
+                                key=f"pdf_admin_{row['id']}")
 
         col1, col2, col3 = st.columns(3)
 
-        if col1.button("Aprovar", key=f"ap_{row['id']}"):
+        if col1.button("Aprovar", key=f"a_{row['id']}"):
             conn.execute("UPDATE despesas SET status='APROVADO', data_aprovacao=? WHERE id=?",
                          (datetime.now(),row['id']))
 
-        if col2.button("Pagar", key=f"pg_{row['id']}"):
+        if col2.button("Pagar", key=f"p_{row['id']}"):
             conn.execute("UPDATE despesas SET status='PAGO', data_pagamento=? WHERE id=?",
                          (datetime.now(),row['id']))
 
-        if col3.button("Rejeitar", key=f"rj_{row['id']}"):
+        if col3.button("Rejeitar", key=f"r_{row['id']}"):
             conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?",(row['id'],))
 
         st.markdown('</div>', unsafe_allow_html=True)
