@@ -9,7 +9,7 @@ from datetime import datetime
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# 🎨 ESTILO
+# 🎨 ESTILO SAAS
 # =========================
 st.markdown("""
 <style>
@@ -25,7 +25,7 @@ body {
     box-shadow: 0 0 20px rgba(0,0,0,0.3);
 }
 .title {
-    font-size:30px;
+    font-size:28px;
     font-weight:bold;
 }
 </style>
@@ -205,6 +205,8 @@ if menu == "Dashboard":
 # =========================
 elif menu == "Despesas":
 
+    st.markdown('<div class="title">💳 Nova Despesa</div>', unsafe_allow_html=True)
+
     desc = st.text_input("Descrição")
     valor = st.number_input("Valor", min_value=0.0)
     categoria = st.selectbox("Categoria", ["Alimentação", "Transporte", "Outros"])
@@ -230,7 +232,7 @@ elif menu == "Despesas":
         st.success("Despesa enviada!")
 
 # =========================
-# REEMBOLSOS (CORRIGIDO)
+# REEMBOLSOS TOP
 # =========================
 elif menu == "Reembolsos":
 
@@ -238,11 +240,28 @@ elif menu == "Reembolsos":
         st.error("Apenas admin")
         st.stop()
 
-    st.markdown('<div class="title">💰 Reembolsos</div>', unsafe_allow_html=True)
+    st.markdown('<div class="title">💰 Gestão de Reembolsos</div>', unsafe_allow_html=True)
 
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
+    # 🔥 FILTROS
+    col1, col2, col3 = st.columns(3)
+
+    user_filtro = col1.selectbox("Funcionário", ["Todos"] + list(df["usuario"].unique()))
+    status_filtro = col2.selectbox("Status", ["Todos", "PENDENTE", "APROVADO", "PAGO", "REJEITADO"])
+    data_filtro = col3.date_input("Data", value=None)
+
+    if user_filtro != "Todos":
+        df = df[df["usuario"] == user_filtro]
+
+    if status_filtro != "Todos":
+        df = df[df["status"] == status_filtro]
+
+    total = df["valor"].sum() if not df.empty else 0
+    st.metric("💰 Total filtrado", f"R$ {total:.2f}")
+
+    # 🔥 LISTAGEM
     for _, row in df.iterrows():
 
         st.markdown('<div class="card">', unsafe_allow_html=True)
@@ -252,7 +271,7 @@ elif menu == "Reembolsos":
         st.write(f"✔ Aprovado: {row['data_aprovacao']}")
         st.write(f"💸 Pago: {row['data_pagamento']}")
 
-        # 🔥 ANEXOS
+        # 📎 ANEXOS
         if row["arquivos"]:
             arquivos = row["arquivos"].split(",")
 
@@ -264,11 +283,7 @@ elif menu == "Reembolsos":
 
                     elif arq.lower().endswith(".pdf"):
                         with open(arq, "rb") as f:
-                            st.download_button(
-                                "📄 Abrir PDF",
-                                f,
-                                file_name=os.path.basename(arq)
-                            )
+                            st.download_button("📄 Baixar PDF", f, file_name=os.path.basename(arq))
 
         col1, col2, col3 = st.columns(3)
 
@@ -285,9 +300,6 @@ elif menu == "Reembolsos":
                          (row['id'],))
 
         st.markdown('</div>', unsafe_allow_html=True)
-
-    conn.commit()
-    conn.close()
 
     conn.commit()
     conn.close()
