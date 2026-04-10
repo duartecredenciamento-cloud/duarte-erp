@@ -9,25 +9,18 @@ from datetime import datetime
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# 🎨 ESTILO
+# ESTILO
 # =========================
 st.markdown("""
 <style>
-body {
-    background: linear-gradient(135deg,#0f172a,#020617);
-    color: #e2e8f0;
-}
+body {background:#0f172a;color:#e2e8f0;}
 .card {
-    background: linear-gradient(145deg,#1e293b,#0f172a);
+    background:#111827;
     padding:20px;
     border-radius:15px;
     margin-bottom:15px;
-    box-shadow: 0 0 15px rgba(0,0,0,0.3);
 }
-.title {
-    font-size:28px;
-    font-weight:bold;
-}
+.title {font-size:28px;font-weight:bold;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -99,6 +92,18 @@ def login(user, senha):
         return r
     return None
 
+def criar_usuario(user, senha):
+    conn = connect()
+    senha_hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
+    try:
+        conn.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?)", (user, senha_hash, 0))
+        conn.commit()
+        return True
+    except:
+        return False
+    finally:
+        conn.close()
+
 # =========================
 # SESSION
 # =========================
@@ -106,7 +111,7 @@ if "logado" not in st.session_state:
     st.session_state["logado"] = False
 
 # =========================
-# LOGIN
+# LOGIN + CADASTRO
 # =========================
 if not st.session_state["logado"]:
 
@@ -116,18 +121,31 @@ if not st.session_state["logado"]:
     </div>
     """, unsafe_allow_html=True)
 
-    user = st.text_input("Usuário")
-    senha = st.text_input("Senha", type="password")
+    abas = st.tabs(["Login", "Criar Conta"])
 
-    if st.button("Entrar"):
-        r = login(user, senha)
-        if r:
-            st.session_state["logado"] = True
-            st.session_state["usuario"] = r[1]
-            st.session_state["admin"] = r[3]
-            st.rerun()
-        else:
-            st.error("Erro login")
+    with abas[0]:
+        user = st.text_input("Usuário")
+        senha = st.text_input("Senha", type="password")
+
+        if st.button("Entrar"):
+            r = login(user, senha)
+            if r:
+                st.session_state["logado"] = True
+                st.session_state["usuario"] = r[1]
+                st.session_state["admin"] = r[3]
+                st.rerun()
+            else:
+                st.error("Erro login")
+
+    with abas[1]:
+        novo_user = st.text_input("Novo usuário")
+        nova_senha = st.text_input("Senha", type="password")
+
+        if st.button("Criar Conta"):
+            if criar_usuario(novo_user, nova_senha):
+                st.success("Conta criada!")
+            else:
+                st.error("Usuário já existe")
 
     st.stop()
 
@@ -158,6 +176,7 @@ centros = [
 # DASHBOARD
 # =========================
 if menu == "Dashboard":
+
     st.markdown('<div class="title">📊 Dashboard</div>', unsafe_allow_html=True)
 
     conn = connect()
@@ -169,6 +188,10 @@ if menu == "Dashboard":
         st.plotly_chart(px.pie(df, names="categoria", values="valor"))
         st.plotly_chart(px.bar(df, x="centro_custo", y="valor"))
 
+        st.markdown("## 📊 Centro de Custos (Análise)")
+        st.plotly_chart(px.pie(df, names="centro_custo", values="valor"))
+        st.plotly_chart(px.bar(df, x="centro_custo", y="valor"))
+
     conn.close()
 
 # =========================
@@ -176,32 +199,55 @@ if menu == "Dashboard":
 # =========================
 elif menu == "Despesas":
 
-    desc = st.text_input("Descrição")
-    valor = st.number_input("Valor", min_value=0.0)
-    categoria = st.selectbox("Categoria", categorias)
-    centro = st.selectbox("Centro de Custo", centros)
-    arquivos = st.file_uploader("Nota", accept_multiple_files=True)
+    tab1, tab2 = st.tabs(["Nova", "Minhas"])
 
-    if st.button("Enviar"):
-        paths = []
-        for arq in arquivos:
-            p = f"uploads/{arq.name}"
-            with open(p, "wb") as f:
-                f.write(arq.read())
-            paths.append(p)
+    conn = connect()
 
-        conn = connect()
-        conn.execute("""
-        INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (st.session_state["usuario"], desc, categoria, centro, valor, ",".join(paths)))
-        conn.commit()
-        conn.close()
+    # NOVA
+    with tab1:
+        desc = st.text_input("Descrição")
+        valor = st.number_input("Valor", min_value=0.0)
+        categoria = st.selectbox("Categoria", categorias)
+        centro = st.selectbox("Centro de Custo", centros)
+        arquivos = st.file_uploader("Nota", accept_multiple_files=True)
 
-        st.success("Enviado!")
+        if st.button("Enviar"):
+            paths = []
+            for arq in arquivos:
+                p = f"uploads/{arq.name}"
+                with open(p, "wb") as f:
+                    f.write(arq.read())
+                paths.append(p)
+
+            conn.execute("""
+            INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (st.session_state["usuario"], desc, categoria, centro, valor, ",".join(paths)))
+
+            conn.commit()
+            st.success("Enviado!")
+
+    # MINHAS
+    with tab2:
+        df = pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'", conn)
+
+        for i, row in df.iterrows():
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+
+            st.write(f"💰 {row['valor']} | {row['status']}")
+            st.write(row["descricao"])
+
+            if st.button("Excluir", key=f"del{i}"):
+                conn.execute("DELETE FROM despesas WHERE id=?", (row["id"],))
+                conn.commit()
+                st.rerun()
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    conn.close()
 
 # =========================
-# REEMBOLSOS (ADMIN)
+# REEMBOLSOS
 # =========================
 elif menu == "Reembolsos":
 
@@ -213,14 +259,12 @@ elif menu == "Reembolsos":
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
     for i, row in df.iterrows():
-
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        st.write(f"👤 {row['usuario']} | 💰 {row['valor']} | 📌 {row['status']}")
+        st.write(f"{row['usuario']} | {row['valor']} | {row['status']}")
 
-        # EDITAR
         nova_cat = st.selectbox("Categoria", categorias, key=f"cat{i}")
-        novo_centro = st.selectbox("Centro", centros, key=f"centro{i}")
+        novo_centro = st.selectbox("Centro", centros, key=f"cent{i}")
         novo_valor = st.number_input("Valor", value=row["valor"], key=f"val{i}")
 
         if st.button("Salvar", key=f"save{i}"):
@@ -229,16 +273,6 @@ elif menu == "Reembolsos":
             """, (nova_cat, novo_centro, novo_valor, row["id"]))
             conn.commit()
             st.success("Atualizado")
-
-        # ANEXOS
-        if row["arquivos"]:
-            for arq in row["arquivos"].split(","):
-                if os.path.exists(arq):
-                    if arq.endswith((".png",".jpg",".jpeg")):
-                        st.image(arq, width=200)
-                    elif arq.endswith(".pdf"):
-                        with open(arq, "rb") as f:
-                            st.download_button("PDF", f, key=f"pdf{i}")
 
         col1, col2, col3 = st.columns(3)
 
