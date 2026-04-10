@@ -5,24 +5,51 @@ import pandas as pd
 import plotly.express as px
 import bcrypt
 from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
 
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# ESTILO
+# CONFIG EMAIL
 # =========================
-st.markdown("""
-<style>
-body {background:#0f172a;color:#e2e8f0;}
-.card {
-    background:#111827;
-    padding:20px;
-    border-radius:15px;
-    margin-bottom:15px;
-}
-.title {font-size:28px;font-weight:bold;}
-</style>
-""", unsafe_allow_html=True)
+EMAIL_REMETENTE = "SEUEMAIL@gmail.com"
+SENHA_EMAIL = "SENHA_APP"
+
+# =========================
+# FUNÇÃO EMAIL
+# =========================
+def enviar_email(destinatario, nome, descricao, valor, categoria):
+    corpo = f"""
+Olá {nome},
+
+🎉 Seu reembolso foi aprovado e pago com sucesso!
+
+📌 Detalhes:
+- Descrição: {descricao}
+- Categoria: {categoria}
+- Valor: R$ {valor}
+
+💰 Status: PAGO
+
+⚠️ Este é um e-mail automático. Não responda.
+
+Atenciosamente,  
+Duarte Gestão 🚀
+"""
+
+    msg = MIMEText(corpo)
+    msg["Subject"] = "💰 Reembolso Pago - Duarte Gestão"
+    msg["From"] = EMAIL_REMETENTE
+    msg["To"] = destinatario
+
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(EMAIL_REMETENTE, SENHA_EMAIL)
+            server.send_message(msg)
+    except Exception as e:
+        print("Erro email:", e)
 
 # =========================
 # DB
@@ -38,7 +65,9 @@ def criar_tabelas():
     c.execute("""
     CREATE TABLE IF NOT EXISTS usuarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
         usuario TEXT UNIQUE,
+        email TEXT,
         senha TEXT,
         admin INTEGER
     )
@@ -54,8 +83,6 @@ def criar_tabelas():
         valor REAL,
         arquivos TEXT,
         status TEXT DEFAULT 'PENDENTE',
-        data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        data_aprovacao TIMESTAMP,
         data_pagamento TIMESTAMP
     )
     """)
@@ -67,7 +94,8 @@ def criar_admin():
     conn = connect()
     senha_hash = bcrypt.hashpw("123456".encode(), bcrypt.gensalt()).decode()
     try:
-        conn.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?)", ("admin", senha_hash, 1))
+        conn.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?, ?, ?)",
+                     ("Admin","admin","admin@email.com", senha_hash, 1))
         conn.commit()
     except:
         pass
@@ -88,15 +116,16 @@ def login(user, senha):
     c.execute("SELECT * FROM usuarios WHERE usuario=?", (user,))
     r = c.fetchone()
     conn.close()
-    if r and verificar_senha(senha, r[2]):
+    if r and verificar_senha(senha, r[4]):
         return r
     return None
 
-def criar_usuario(user, senha):
+def criar_usuario(nome, user, email, senha):
     conn = connect()
     senha_hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
     try:
-        conn.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?)", (user, senha_hash, 0))
+        conn.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?, ?, ?)",
+                     (nome, user, email, senha_hash, 0))
         conn.commit()
         return True
     except:
@@ -115,12 +144,6 @@ if "logado" not in st.session_state:
 # =========================
 if not st.session_state["logado"]:
 
-    st.markdown("""
-    <div style="text-align:center;">
-        <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="200">
-    </div>
-    """, unsafe_allow_html=True)
-
     abas = st.tabs(["Login", "Criar Conta"])
 
     with abas[0]:
@@ -131,120 +154,46 @@ if not st.session_state["logado"]:
             r = login(user, senha)
             if r:
                 st.session_state["logado"] = True
-                st.session_state["usuario"] = r[1]
-                st.session_state["admin"] = r[3]
+                st.session_state["usuario"] = r[2]
+                st.session_state["admin"] = r[5]
+                st.session_state["nome"] = r[1]
+                st.session_state["email"] = r[3]
                 st.rerun()
-            else:
-                st.error("Erro login")
 
     with abas[1]:
-        novo_user = st.text_input("Novo usuário")
-        nova_senha = st.text_input("Senha", type="password")
+        nome = st.text_input("Nome completo")
+        user = st.text_input("Usuário")
+        email = st.text_input("Email")
+        senha = st.text_input("Senha", type="password")
 
         if st.button("Criar Conta"):
-            if criar_usuario(novo_user, nova_senha):
+            if criar_usuario(nome, user, email, senha):
                 st.success("Conta criada!")
             else:
-                st.error("Usuário já existe")
+                st.error("Erro ao criar")
 
     st.stop()
 
 # =========================
-# SIDEBAR
+# MENU
 # =========================
-menu = st.sidebar.radio("Menu", ["Dashboard", "Despesas", "Reembolsos"])
-
-if st.sidebar.button("Sair"):
-    st.session_state["logado"] = False
-    st.rerun()
-
-# =========================
-# LISTAS
-# =========================
-categorias = [
-"Limpeza","Remuneração Sócios","Alimentação","Telefonia e Internet",
-"Software e Licenças","Transportes / Logística","Material de Escritório",
-"Equipamentos de Informática","Estacionamento","Móveis e Utensílios",
-"Despesas de Viagens","Máquinas e Equipamentos"
-]
-
-centros = [
-"Credenciamento","Rede","Diretoria","Duarte Gestão","Marketing","Financeiro"
-]
-
-# =========================
-# DASHBOARD
-# =========================
-if menu == "Dashboard":
-
-    st.markdown('<div class="title">📊 Dashboard</div>', unsafe_allow_html=True)
-
-    conn = connect()
-    df = pd.read_sql("SELECT * FROM despesas", conn)
-
-    st.metric("Total", f"R$ {df['valor'].sum() if not df.empty else 0:.2f}")
-
-    if not df.empty:
-        st.plotly_chart(px.pie(df, names="categoria", values="valor"))
-        st.plotly_chart(px.bar(df, x="centro_custo", y="valor"))
-
-        st.markdown("## 📊 Centro de Custos (Análise)")
-        st.plotly_chart(px.pie(df, names="centro_custo", values="valor"))
-        st.plotly_chart(px.bar(df, x="centro_custo", y="valor"))
-
-    conn.close()
+menu = st.sidebar.radio("Menu", ["Despesas", "Reembolsos"])
 
 # =========================
 # DESPESAS
 # =========================
-elif menu == "Despesas":
+if menu == "Despesas":
+    desc = st.text_input("Descrição")
+    valor = st.number_input("Valor")
+    categoria = st.text_input("Categoria")
 
-    tab1, tab2 = st.tabs(["Nova", "Minhas"])
-
-    conn = connect()
-
-    # NOVA
-    with tab1:
-        desc = st.text_input("Descrição")
-        valor = st.number_input("Valor", min_value=0.0)
-        categoria = st.selectbox("Categoria", categorias)
-        centro = st.selectbox("Centro de Custo", centros)
-        arquivos = st.file_uploader("Nota", accept_multiple_files=True)
-
-        if st.button("Enviar"):
-            paths = []
-            for arq in arquivos:
-                p = f"uploads/{arq.name}"
-                with open(p, "wb") as f:
-                    f.write(arq.read())
-                paths.append(p)
-
-            conn.execute("""
-            INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """, (st.session_state["usuario"], desc, categoria, centro, valor, ",".join(paths)))
-
-            conn.commit()
-            st.success("Enviado!")
-
-    # MINHAS
-    with tab2:
-        df = pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'", conn)
-
-        for i, row in df.iterrows():
-            st.markdown('<div class="card">', unsafe_allow_html=True)
-
-            st.write(f"💰 {row['valor']} | {row['status']}")
-            st.write(row["descricao"])
-
-            if st.button("Excluir", key=f"del{i}"):
-                conn.execute("DELETE FROM despesas WHERE id=?", (row["id"],))
-                conn.commit()
-                st.rerun()
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    conn.close()
+    if st.button("Enviar"):
+        conn = connect()
+        conn.execute("INSERT INTO despesas (usuario, descricao, categoria, valor) VALUES (?, ?, ?, ?)",
+                     (st.session_state["usuario"], desc, categoria, valor))
+        conn.commit()
+        conn.close()
+        st.success("Enviado!")
 
 # =========================
 # REEMBOLSOS
@@ -252,44 +201,35 @@ elif menu == "Despesas":
 elif menu == "Reembolsos":
 
     if not st.session_state.get("admin"):
-        st.error("Apenas admin")
         st.stop()
 
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
     for i, row in df.iterrows():
-        st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        st.write(f"{row['usuario']} | {row['valor']} | {row['status']}")
+        if st.button("Pagar", key=i):
 
-        nova_cat = st.selectbox("Categoria", categorias, key=f"cat{i}")
-        novo_centro = st.selectbox("Centro", centros, key=f"cent{i}")
-        novo_valor = st.number_input("Valor", value=row["valor"], key=f"val{i}")
+            # pegar dados do usuário
+            c = conn.cursor()
+            c.execute("SELECT nome, email FROM usuarios WHERE usuario=?", (row["usuario"],))
+            user_data = c.fetchone()
 
-        if st.button("Salvar", key=f"save{i}"):
-            conn.execute("""
-            UPDATE despesas SET categoria=?, centro_custo=?, valor=? WHERE id=?
-            """, (nova_cat, novo_centro, novo_valor, row["id"]))
-            conn.commit()
-            st.success("Atualizado")
+            if user_data:
+                nome, email = user_data
 
-        col1, col2, col3 = st.columns(3)
+                enviar_email(
+                    email,
+                    nome,
+                    row["descricao"],
+                    row["valor"],
+                    row["categoria"]
+                )
 
-        if col1.button("Aprovar", key=f"a{i}"):
-            conn.execute("UPDATE despesas SET status='APROVADO', data_aprovacao=? WHERE id=?",
-                         (datetime.now(), row["id"]))
-
-        if col2.button("Pagar", key=f"p{i}"):
             conn.execute("UPDATE despesas SET status='PAGO', data_pagamento=? WHERE id=?",
                          (datetime.now(), row["id"]))
+            conn.commit()
 
-        if col3.button("Rejeitar", key=f"r{i}"):
-            conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?",
-                         (row["id"],))
-
-        conn.commit()
-
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.success("Pago + Email enviado!")
 
     conn.close()
