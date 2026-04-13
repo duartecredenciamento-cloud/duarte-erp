@@ -11,30 +11,88 @@ from email.mime.text import MIMEText
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# EMAIL CONFIG
+# 🎨 ESTILO PROFISSIONAL
+# =========================
+st.markdown("""
+<style>
+body {
+    background: linear-gradient(135deg,#020617,#0f172a);
+    color: #e2e8f0;
+}
+
+/* LOGO */
+.logo img {
+    transition: 0.3s;
+}
+.logo img:hover {
+    transform: scale(1.08);
+}
+
+/* BOTÕES */
+.stButton button {
+    background: linear-gradient(90deg,#2563eb,#06b6d4);
+    border-radius: 10px;
+    color: white;
+    font-weight: bold;
+    border: none;
+    padding: 8px;
+    transition: 0.3s;
+}
+.stButton button:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 0px 15px rgba(37,99,235,0.6);
+}
+
+/* CARDS */
+.card {
+    background: linear-gradient(145deg,#1e293b,#020617);
+    padding:20px;
+    border-radius:15px;
+    margin-bottom:15px;
+    box-shadow: 0px 0px 15px rgba(0,0,0,0.4);
+    animation: fadeIn 0.4s ease-in;
+}
+
+@keyframes fadeIn {
+    from {opacity:0; transform:translateY(10px);}
+    to {opacity:1; transform:translateY(0);}
+}
+</style>
+""", unsafe_allow_html=True)
+
+# =========================
+# 🔥 LOGO TOPO
+# =========================
+st.markdown("""
+<div class="logo" style="text-align:center;">
+<a href="https://www.duartegestao.com.br/index.html" target="_blank">
+<img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="220">
+</a>
+</div>
+""", unsafe_allow_html=True)
+
+# =========================
+# EMAIL
 # =========================
 EMAIL_REMETENTE = "financeiro.duartegestao@gmail.com"
-SENHA_EMAIL = "apqc vzxq isvs yfuz"
+SENHA_EMAIL = "bppd twbk bupr pzws"
 
 def enviar_email(destinatario, nome, descricao, valor, categoria):
     corpo = f"""
 Olá {nome},
 
-🎉 SEU REEMBOLSO FOI PAGO!
+🎉 Seu reembolso foi PAGO!
 
-📌 Descrição: {descricao}
-📂 Categoria: {categoria}
-💰 Valor: R$ {valor}
+📌 {descricao}
+📂 {categoria}
+💰 R$ {valor}
 
-Seu pagamento já foi realizado com sucesso.
+⚠️ Não responda este e-mail.
 
-⚠️ Este é um e-mail automático, não responda.
-
-Atenciosamente,  
 Duarte Gestão 🚀
 """
     msg = MIMEText(corpo)
-    msg["Subject"] = "💰 Reembolso Pago - Duarte Gestão"
+    msg["Subject"] = "Reembolso Pago"
     msg["From"] = EMAIL_REMETENTE
     msg["To"] = destinatario
 
@@ -43,24 +101,8 @@ Duarte Gestão 🚀
             server.starttls()
             server.login(EMAIL_REMETENTE, SENHA_EMAIL)
             server.send_message(msg)
-    except Exception as e:
-        st.error(f"Erro ao enviar email: {e}")
-
-# =========================
-# LISTAS
-# =========================
-CATEGORIAS = [
-"Limpeza","Remuneração Sócios","Alimentação","Telefonia e Internet",
-"Software E Licenças - Informática","Transportes / Logística",
-"Material de Escritório","Equipamentos de Informática",
-"Estacionamento","Móveis e Utensílios",
-"Despesas de Viagens","Máquinas e Equipamentos"
-]
-
-CENTROS = [
-"CREDENCIAMENTO","REDE","DIRETORIA",
-"DUARTE GESTÃO","MARKETING","FINANCEIRO"
-]
+    except:
+        pass
 
 # =========================
 # DB
@@ -92,6 +134,7 @@ def criar_tabelas():
         centro TEXT,
         valor REAL,
         status TEXT,
+        data_criacao TEXT,
         data_pagamento TEXT
     )
     """)
@@ -127,17 +170,6 @@ def login(user, senha):
         return r
     return None
 
-def criar_usuario(nome, user, email, senha):
-    conn = connect()
-    senha_hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
-    try:
-        conn.execute("INSERT INTO usuarios VALUES (NULL,?,?,?,?,?)",
-                     (nome,user,email,senha_hash,0))
-        conn.commit()
-        return True
-    except:
-        return False
-
 # =========================
 # SESSION
 # =========================
@@ -149,47 +181,42 @@ if "logado" not in st.session_state:
 # =========================
 if not st.session_state["logado"]:
 
-    abas = st.tabs(["Login","Criar Conta"])
+    u = st.text_input("Usuário")
+    s = st.text_input("Senha", type="password")
 
-    with abas[0]:
-        u = st.text_input("Usuário", key="l1")
-        s = st.text_input("Senha", type="password", key="l2")
-
-        if st.button("Entrar"):
-            r = login(u,s)
-            if r:
-                st.session_state["logado"]=True
-                st.session_state["usuario"]=r[2]
-                st.session_state["admin"]=r[5]
-                st.session_state["nome"]=r[1]
-                st.session_state["email"]=r[3]
-                st.rerun()
-
-    with abas[1]:
-        n = st.text_input("Nome")
-        u = st.text_input("Usuário")
-        e = st.text_input("Email")
-        s = st.text_input("Senha", type="password")
-
-        if st.button("Criar Conta"):
-            if criar_usuario(n,u,e,s):
-                st.success("Conta criada!")
+    if st.button("Entrar"):
+        r = login(u,s)
+        if r:
+            st.session_state["logado"]=True
+            st.session_state["usuario"]=r[2]
+            st.session_state["admin"]=r[5]
+            st.session_state["nome"]=r[1]
+            st.session_state["email"]=r[3]
+            st.rerun()
 
     st.stop()
 
 # =========================
-# MENU
+# SIDEBAR LOGO
 # =========================
+st.sidebar.markdown("""
+<a href="https://www.duartegestao.com.br/index.html" target="_blank">
+<img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="160">
+</a>
+""", unsafe_allow_html=True)
+
 menu = st.sidebar.radio("Menu", ["Dashboard","Despesas","Reembolsos"])
 
 # =========================
 # DASHBOARD
 # =========================
 if menu == "Dashboard":
+
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
     if not df.empty:
+        st.metric("Total", f"R$ {df['valor'].sum():.2f}")
         st.plotly_chart(px.pie(df, names="categoria", values="valor"))
         st.plotly_chart(px.bar(df, x="centro", y="valor"))
 
@@ -202,14 +229,13 @@ elif menu == "Despesas":
 
     desc = st.text_input("Descrição")
     valor = st.number_input("Valor")
-    categoria = st.selectbox("Categoria", CATEGORIAS)
-    centro = st.selectbox("Centro de Custo", CENTROS)
 
     if st.button("Enviar"):
         conn = connect()
         conn.execute("""
-        INSERT INTO despesas VALUES (NULL,?,?,?,?,?,?,?)
-        """,(st.session_state["usuario"],desc,categoria,centro,valor,"PENDENTE",None))
+        INSERT INTO despesas VALUES (NULL,?,?,?,?,?,?,?,?)
+        """,(st.session_state["usuario"],desc,"Outros","FINANCEIRO",valor,
+             "PENDENTE",datetime.now(),None))
         conn.commit()
         conn.close()
         st.success("Enviado!")
@@ -227,23 +253,35 @@ elif menu == "Reembolsos":
 
     for _,row in df.iterrows():
 
-        st.write(row["usuario"], row["descricao"], row["valor"], row["status"])
+        st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        if st.button("Pagar", key=f"pg_{row['id']}"):
+        st.write(f"👤 {row['usuario']}")
+        st.write(f"📌 {row['descricao']}")
+        st.write(f"💰 R$ {row['valor']}")
+        st.write(f"📊 Status: {row['status']}")
+        st.write(f"🕒 Criado em: {row['data_criacao']}")
+        st.write(f"💸 Pago em: {row['data_pagamento']}")
 
-            user = conn.execute(
-                "SELECT nome,email FROM usuarios WHERE usuario=?",
-                (row["usuario"],)
-            ).fetchone()
+        col1,col2 = st.columns(2)
+
+        if col1.button("💰 Pagar", key=f"pg_{row['id']}"):
+            user = conn.execute("SELECT nome,email FROM usuarios WHERE usuario=?",
+                                (row["usuario"],)).fetchone()
 
             if user:
                 enviar_email(user[1], user[0], row["descricao"], row["valor"], row["categoria"])
 
-            conn.execute("""
-            UPDATE despesas SET status='PAGO', data_pagamento=? WHERE id=?
-            """,(datetime.now(), row["id"]))
-
+            conn.execute("UPDATE despesas SET status='PAGO', data_pagamento=? WHERE id=?",
+                         (datetime.now(), row["id"]))
             conn.commit()
+
             st.success("Pago + Email enviado!")
+
+        if col2.button("❌ Excluir", key=f"del_{row['id']}"):
+            conn.execute("DELETE FROM despesas WHERE id=?", (row["id"],))
+            conn.commit()
+            st.rerun()
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     conn.close()
