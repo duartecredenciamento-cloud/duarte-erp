@@ -11,7 +11,7 @@ from email.mime.text import MIMEText
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# 🎨 ESTILO PROFISSIONAL + ANIMAÇÃO
+# 🎨 ESTILO + ANIMAÇÃO
 # =========================
 st.markdown("""
 <style>
@@ -20,50 +20,27 @@ body {
     color: #e2e8f0;
 }
 
-section[data-testid="stSidebar"] {
-    background: #020617;
-}
-
 .card {
     background: #1e293b;
     padding:20px;
     border-radius:12px;
     margin-bottom:15px;
     animation: fadeIn 0.4s ease-in;
-    box-shadow: 0 0 15px rgba(0,0,0,0.3);
 }
 
 @keyframes fadeIn {
-    from {opacity:0; transform:translateY(15px);}
+    from {opacity:0; transform:translateY(10px);}
     to {opacity:1; transform:translateY(0);}
 }
 
-button[kind="primary"] {
-    border-radius:10px;
-    transition:0.2s;
-}
-
 button[kind="primary"]:hover {
-    transform:scale(1.07);
-    background-color:#2563eb !important;
-}
-
-/* MENU ANIMADO */
-div[role="radiogroup"] label {
-    transition:0.2s;
-    padding:8px;
-    border-radius:8px;
-}
-
-div[role="radiogroup"] label:hover {
-    background:#1e293b;
-    transform:translateX(5px);
+    transform:scale(1.05);
 }
 </style>
 """, unsafe_allow_html=True)
 
 # =========================
-# 🔥 LOGO CLICÁVEL
+# 🔥 LOGO TOPO
 # =========================
 st.markdown("""
 <div style="text-align:center;">
@@ -74,25 +51,25 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================
-# EMAIL
+# 📧 EMAIL
 # =========================
 EMAIL_REMETENTE = "financeiro.duartegestao@gmail.com"
-SENHA_EMAIL = "aywd uklm zpkl mqgr"
+SENHA_EMAIL = "SUA_SENHA_APP"
 
 def enviar_email(destinatario, nome, descricao, valor, categoria):
     try:
         corpo = f"""
 Olá {nome},
 
-Seu reembolso foi aprovado e pago com sucesso!
+🎉 Seu reembolso foi aprovado e pago!
 
-Descrição: {descricao}
-Categoria: {categoria}
-Valor: R$ {valor}
+📌 Descrição: {descricao}
+📂 Categoria: {categoria}
+💰 Valor: R$ {valor}
 
 ⚠️ NÃO RESPONDER ESTE EMAIL
 
-Duarte Gestão
+Duarte Gestão 🚀
 """
         msg = MIMEText(corpo)
         msg["Subject"] = "💰 Reembolso Pago"
@@ -135,6 +112,7 @@ def criar_tabelas():
         usuario TEXT,
         descricao TEXT,
         categoria TEXT,
+        centro_custo TEXT,
         valor REAL,
         arquivos TEXT,
         status TEXT DEFAULT 'PENDENTE',
@@ -152,9 +130,8 @@ def criar_admins():
 
     usuarios = [
         ("Admin", "admin", "admin@email.com", "123456", "admin"),
-        ("Financeiro", "financeiro", "financeiro@email.com", "123456", "financeiro")
-    
-         
+        ("Financeiro", "financeiro", "financeiro@email.com", "123456", "financeiro"),
+        ("Operacional", "operacional", "operacional@email.com", "123456", "operacional"),
     ]
 
     for nome, user, email, senha, tipo in usuarios:
@@ -232,15 +209,20 @@ if not st.session_state["logado"]:
     st.stop()
 
 # =========================
-# MENU
+# SIDEBAR COM LOGO
 # =========================
+st.sidebar.markdown("""
+<a href="https://www.duartegestao.com.br/index.html" target="_blank">
+<img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="150">
+</a>
+""", unsafe_allow_html=True)
+
 menu = st.sidebar.radio("Menu", ["Dashboard", "Despesas", "Reembolsos"])
 
 # =========================
 # DASHBOARD
 # =========================
 if menu == "Dashboard":
-
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
@@ -248,7 +230,7 @@ if menu == "Dashboard":
 
     if not df.empty:
         st.plotly_chart(px.pie(df, names="categoria", values="valor"), use_container_width=True)
-        st.plotly_chart(px.bar(df, x="usuario", y="valor"), use_container_width=True)
+        st.plotly_chart(px.bar(df, x="centro_custo", y="valor"), use_container_width=True)
 
     conn.close()
 
@@ -259,35 +241,19 @@ elif menu == "Despesas":
 
     tab1, tab2 = st.tabs(["Nova", "Minhas"])
 
-    # ✅ CATEGORIAS EMPRESA
     categorias = [
-        "Limpeza",
-        "Remuneração Sócios",
-        "Alimentação",
-        "Telefonia e Internet",
-        "Software e Licenças - Informática",
-        "Transportes / Logística",
-        "Material de Escritório",
-        "Equipamentos de Informática",
-        "Estacionamento",
-        "Móveis e Utensílios",
-        "Despesas de Viagens",
-        "Máquinas e Equipamentos"
+        "Limpeza","Remuneração Sócios","Alimentação","Telefonia e Internet",
+        "Software e Licenças - Informática","Transportes / Logística",
+        "Material de Escritório","Equipamentos de Informática",
+        "Estacionamento","Móveis e Utensílios",
+        "Despesas de Viagens","Máquinas e Equipamentos"
     ]
 
-    # ✅ CENTRO DE CUSTO
     centros = [
-        "CREDENCIAMENTO",
-        "REDE",
-        "DIRETORIA",
-        "DUARTE GESTÃO",
-        "MARKETING",
-        "FINANCEIRO"
+        "CREDENCIAMENTO","REDE","DIRETORIA",
+        "DUARTE GESTÃO","MARKETING","FINANCEIRO"
     ]
 
-    # =========================
-    # ➕ NOVA DESPESA
-    # =========================
     with tab1:
         desc = st.text_input("Descrição", key="desc")
         valor = st.number_input("Valor", key="valor")
@@ -295,71 +261,28 @@ elif menu == "Despesas":
         categoria = st.selectbox("Categoria", categorias, key="cat")
         centro = st.selectbox("Centro de Custo", centros, key="centro")
 
-        arquivos = st.file_uploader("Arquivos", accept_multiple_files=True, key="upload")
-
         if st.button("Enviar", key="btn_env"):
-            lista = []
-            for arq in arquivos:
-                path = f"uploads/{arq.name}"
-                with open(path, "wb") as f:
-                    f.write(arq.read())
-                lista.append(path)
-
             conn = connect()
             conn.execute("""
-            INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """, (st.session_state["usuario"], desc, categoria, centro, valor, ",".join(lista)))
+            INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor)
+            VALUES (?, ?, ?, ?, ?)
+            """, (st.session_state["usuario"], desc, categoria, centro, valor))
             conn.commit()
             conn.close()
 
             st.success("Despesa enviada!")
 
-    # =========================
-    # 👤 MINHAS DESPESAS
-    # =========================
     with tab2:
         conn = connect()
-        df = pd.read_sql(
-            f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'",
-            conn
-        )
+        df = pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'", conn)
 
         for _, row in df.iterrows():
-            st.markdown("### 📄 Despesa")
-            st.write(f"📌 {row['descricao']}")
-            st.write(f"💰 R$ {row['valor']}")
-            st.write(f"🏷️ {row['categoria']} | 🏢 {row['centro_custo']}")
-            st.write(f"📅 {row['data_criacao']}")
+            st.write(f"{row['descricao']} - R$ {row['valor']}")
 
-            col1, col2 = st.columns(2)
-
-            # ❌ EXCLUIR
-            if col1.button("Excluir", key=f"del_{row['id']}"):
+            if st.button("Excluir", key=f"del_{row['id']}"):
                 conn.execute("DELETE FROM despesas WHERE id=?", (row["id"],))
                 conn.commit()
                 st.rerun()
-
-            # ✏️ EDITAR
-            if col2.button("Editar", key=f"edit_{row['id']}"):
-                st.session_state["editando"] = row["id"]
-
-            # ✏️ FORM EDIT
-            if st.session_state.get("editando") == row["id"]:
-                new_desc = st.text_input("Nova descrição", value=row["descricao"], key=f"ed_desc_{row['id']}")
-                new_valor = st.number_input("Novo valor", value=row["valor"], key=f"ed_val_{row['id']}")
-                new_cat = st.selectbox("Categoria", categorias, index=categorias.index(row["categoria"]), key=f"ed_cat_{row['id']}")
-                new_centro = st.selectbox("Centro", centros, index=centros.index(row["centro_custo"]), key=f"ed_centro_{row['id']}")
-
-                if st.button("Salvar", key=f"save_{row['id']}"):
-                    conn.execute("""
-                    UPDATE despesas
-                    SET descricao=?, valor=?, categoria=?, centro_custo=?
-                    WHERE id=?
-                    """, (new_desc, new_valor, new_cat, new_centro, row["id"]))
-                    conn.commit()
-                    st.session_state["editando"] = None
-                    st.rerun()
 
         conn.close()
 
@@ -368,7 +291,7 @@ elif menu == "Despesas":
 # =========================
 elif menu == "Reembolsos":
 
-    if st.session_state["tipo"] not in ["admin", "financeiro", "operacional"]:
+    if st.session_state["tipo"] not in ["admin", "financeiro"]:
         st.error("Acesso restrito")
         st.stop()
 
@@ -379,7 +302,7 @@ elif menu == "Reembolsos":
 
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
+        st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | {row['status']}")
         st.write(f"📅 Criado: {row['data_criacao']}")
         st.write(f"💸 Pago: {row['data_pagamento']}")
 
