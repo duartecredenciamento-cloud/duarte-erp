@@ -11,7 +11,7 @@ from email.mime.text import MIMEText
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# 🎨 ESTILO PROFISSIONAL
+# 🎨 ESTILO PROFISSIONAL + ANIMAÇÃO
 # =========================
 st.markdown("""
 <style>
@@ -19,29 +19,51 @@ body {
     background: linear-gradient(135deg,#0f172a,#020617);
     color: #e2e8f0;
 }
+
+section[data-testid="stSidebar"] {
+    background: #020617;
+}
+
 .card {
     background: #1e293b;
     padding:20px;
     border-radius:12px;
     margin-bottom:15px;
-    animation: fadeIn 0.5s ease-in;
+    animation: fadeIn 0.4s ease-in;
+    box-shadow: 0 0 15px rgba(0,0,0,0.3);
 }
+
 @keyframes fadeIn {
-    from {opacity:0; transform:translateY(10px);}
+    from {opacity:0; transform:translateY(15px);}
     to {opacity:1; transform:translateY(0);}
 }
+
 button[kind="primary"] {
     border-radius:10px;
-    transition:0.3s;
+    transition:0.2s;
 }
+
 button[kind="primary"]:hover {
-    transform:scale(1.05);
+    transform:scale(1.07);
+    background-color:#2563eb !important;
+}
+
+/* MENU ANIMADO */
+div[role="radiogroup"] label {
+    transition:0.2s;
+    padding:8px;
+    border-radius:8px;
+}
+
+div[role="radiogroup"] label:hover {
+    background:#1e293b;
+    transform:translateX(5px);
 }
 </style>
 """, unsafe_allow_html=True)
 
 # =========================
-# 🔥 LOGO
+# 🔥 LOGO CLICÁVEL
 # =========================
 st.markdown("""
 <div style="text-align:center;">
@@ -52,7 +74,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================
-# 📧 EMAIL CONFIG
+# EMAIL
 # =========================
 EMAIL_REMETENTE = "financeiro.duartegestao@gmail.com"
 SENHA_EMAIL = "aywd uklm zpkl mqgr"
@@ -68,12 +90,12 @@ Descrição: {descricao}
 Categoria: {categoria}
 Valor: R$ {valor}
 
-NÃO RESPONDER ESTE EMAIL.
+⚠️ NÃO RESPONDER ESTE EMAIL
 
 Duarte Gestão
 """
         msg = MIMEText(corpo)
-        msg["Subject"] = "Reembolso Pago"
+        msg["Subject"] = "💰 Reembolso Pago"
         msg["From"] = EMAIL_REMETENTE
         msg["To"] = destinatario
 
@@ -124,21 +146,22 @@ def criar_tabelas():
     conn.commit()
     conn.close()
 
-def criar_usuarios_padrao():
+def criar_admins():
     conn = connect()
     c = conn.cursor()
 
     usuarios = [
         ("Admin", "admin", "admin@email.com", "123456", "admin"),
-        ("Financeiro", "financeiro", "financeiro@email.com", "123456", "financeiro"),
-        ("Operacional", "operacional", "operacional@email.com", "123456", "operacional"),
+        ("Financeiro", "financeiro", "financeiro@email.com", "123456", "financeiro")
+    
+         
     ]
 
     for nome, user, email, senha, tipo in usuarios:
-        senha_hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
+        hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
         try:
             c.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?, ?, ?)",
-                      (nome, user, email, senha_hash, tipo))
+                      (nome, user, email, hash, tipo))
         except:
             pass
 
@@ -146,10 +169,10 @@ def criar_usuarios_padrao():
     conn.close()
 
 criar_tabelas()
-criar_usuarios_padrao()
+criar_admins()
 
 # =========================
-# AUTH
+# LOGIN
 # =========================
 def verificar_senha(senha, hash):
     return bcrypt.checkpw(senha.encode(), hash.encode())
@@ -164,37 +187,21 @@ def login(user, senha):
         return r
     return None
 
-def criar_usuario(nome, user, email, senha):
-    conn = connect()
-    senha_hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
-    try:
-        conn.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?, ?, ?)",
-                     (nome, user, email, senha_hash, "usuario"))
-        conn.commit()
-        return True
-    except:
-        return False
-    finally:
-        conn.close()
-
-# =========================
-# SESSION
-# =========================
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 
 # =========================
-# LOGIN
+# LOGIN / CADASTRO
 # =========================
 if not st.session_state["logado"]:
 
     abas = st.tabs(["Login", "Criar Conta"])
 
     with abas[0]:
-        user = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
+        user = st.text_input("Usuário", key="login_user")
+        senha = st.text_input("Senha", type="password", key="login_pass")
 
-        if st.button("Entrar"):
+        if st.button("Entrar", key="btn_login"):
             r = login(user, senha)
             if r:
                 st.session_state["logado"] = True
@@ -205,16 +212,22 @@ if not st.session_state["logado"]:
                 st.rerun()
 
     with abas[1]:
-        nome = st.text_input("Nome")
-        user = st.text_input("Usuário")
-        email = st.text_input("Email")
-        senha = st.text_input("Senha", type="password")
+        nome = st.text_input("Nome", key="cad_nome")
+        user = st.text_input("Usuário", key="cad_user")
+        email = st.text_input("Email", key="cad_email")
+        senha = st.text_input("Senha", type="password", key="cad_pass")
 
-        if st.button("Criar Conta"):
-            if criar_usuario(nome, user, email, senha):
+        if st.button("Criar Conta", key="btn_criar"):
+            conn = connect()
+            try:
+                hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
+                conn.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?, ?, ?)",
+                             (nome, user, email, hash, "usuario"))
+                conn.commit()
                 st.success("Conta criada!")
-            else:
+            except:
                 st.error("Erro ao criar")
+            conn.close()
 
     st.stop()
 
@@ -227,14 +240,15 @@ menu = st.sidebar.radio("Menu", ["Dashboard", "Despesas", "Reembolsos"])
 # DASHBOARD
 # =========================
 if menu == "Dashboard":
+
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
     st.title("📊 Dashboard")
 
     if not df.empty:
-        st.plotly_chart(px.pie(df, names="categoria", values="valor"))
-        st.plotly_chart(px.bar(df, x="usuario", y="valor"))
+        st.plotly_chart(px.pie(df, names="categoria", values="valor"), use_container_width=True)
+        st.plotly_chart(px.bar(df, x="usuario", y="valor"), use_container_width=True)
 
     conn.close()
 
@@ -246,12 +260,12 @@ elif menu == "Despesas":
     tab1, tab2 = st.tabs(["Nova", "Minhas"])
 
     with tab1:
-        desc = st.text_input("Descrição")
-        valor = st.number_input("Valor")
-        categoria = st.text_input("Categoria")
-        arquivos = st.file_uploader("Arquivos", accept_multiple_files=True)
+        desc = st.text_input("Descrição", key="desc")
+        valor = st.number_input("Valor", key="valor")
+        categoria = st.text_input("Categoria", key="cat")
+        arquivos = st.file_uploader("Arquivos", accept_multiple_files=True, key="upload")
 
-        if st.button("Enviar"):
+        if st.button("Enviar", key="btn_env"):
             lista = []
             for arq in arquivos:
                 path = f"uploads/{arq.name}"
@@ -273,7 +287,7 @@ elif menu == "Despesas":
         conn = connect()
         df = pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'", conn)
 
-        for i, row in df.iterrows():
+        for _, row in df.iterrows():
             st.write(f"{row['descricao']} - R$ {row['valor']}")
 
             if st.button("Excluir", key=f"del_{row['id']}"):
@@ -288,14 +302,14 @@ elif menu == "Despesas":
 # =========================
 elif menu == "Reembolsos":
 
-    if st.session_state["tipo"] not in ["admin", "financeiro"]:
+    if st.session_state["tipo"] not in ["admin", "financeiro", "operacional"]:
         st.error("Acesso restrito")
         st.stop()
 
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
 
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
@@ -314,7 +328,6 @@ elif menu == "Reembolsos":
             conn.commit()
 
         if col3.button("Pagar", key=f"pg_{row['id']}"):
-
             c = conn.cursor()
             c.execute("SELECT nome, email FROM usuarios WHERE usuario=?", (row["usuario"],))
             user_data = c.fetchone()
