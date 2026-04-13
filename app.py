@@ -11,57 +11,38 @@ from email.mime.text import MIMEText
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# 🎨 ESTILO PROFISSIONAL
+# 🎨 ESTILO TOP
 # =========================
 st.markdown("""
 <style>
-body {
-    background: linear-gradient(135deg,#020617,#0f172a);
-    color: #e2e8f0;
-}
+body {background: linear-gradient(135deg,#020617,#0f172a); color:#e2e8f0;}
 
-/* LOGO */
-.logo img {
-    transition: 0.3s;
-}
-.logo img:hover {
-    transform: scale(1.08);
-}
+.logo img:hover {transform:scale(1.05); transition:0.3s;}
 
-/* BOTÕES */
-.stButton button {
-    background: linear-gradient(90deg,#2563eb,#06b6d4);
-    border-radius: 10px;
-    color: white;
-    font-weight: bold;
-    border: none;
-    padding: 8px;
-    transition: 0.3s;
-}
-.stButton button:hover {
-    transform: scale(1.05);
-    box-shadow: 0px 0px 15px rgba(37,99,235,0.6);
-}
-
-/* CARDS */
 .card {
-    background: linear-gradient(145deg,#1e293b,#020617);
+    background:#1e293b;
     padding:20px;
     border-radius:15px;
     margin-bottom:15px;
-    box-shadow: 0px 0px 15px rgba(0,0,0,0.4);
-    animation: fadeIn 0.4s ease-in;
+    animation:fadeIn 0.4s ease-in;
+}
+@keyframes fadeIn {
+    from {opacity:0;}
+    to {opacity:1;}
 }
 
-@keyframes fadeIn {
-    from {opacity:0; transform:translateY(10px);}
-    to {opacity:1; transform:translateY(0);}
+.stButton button {
+    background:linear-gradient(90deg,#2563eb,#06b6d4);
+    border:none;
+    border-radius:10px;
+    color:white;
+    font-weight:bold;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # =========================
-# 🔥 LOGO TOPO
+# LOGO
 # =========================
 st.markdown("""
 <div class="logo" style="text-align:center;">
@@ -72,24 +53,24 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================
-# EMAIL
+# EMAIL CONFIG
 # =========================
 EMAIL_REMETENTE = "financeiro.duartegestao@gmail.com"
-SENHA_EMAIL = "bppd twbk bupr pzws"
+SENHA_EMAIL = "aywd uklm zpkl mqgr"
 
 def enviar_email(destinatario, nome, descricao, valor, categoria):
     corpo = f"""
 Olá {nome},
 
-🎉 Seu reembolso foi PAGO!
+Seu reembolso foi pago!
 
-📌 {descricao}
-📂 {categoria}
-💰 R$ {valor}
+Descrição: {descricao}
+Categoria: {categoria}
+Valor: R$ {valor}
 
-⚠️ Não responda este e-mail.
+Não responda este e-mail.
 
-Duarte Gestão 🚀
+Duarte Gestão
 """
     msg = MIMEText(corpo)
     msg["Subject"] = "Reembolso Pago"
@@ -97,12 +78,28 @@ Duarte Gestão 🚀
     msg["To"] = destinatario
 
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(EMAIL_REMETENTE, SENHA_EMAIL)
-            server.send_message(msg)
+        with smtplib.SMTP("smtp.gmail.com", 587) as s:
+            s.starttls()
+            s.login(EMAIL_REMETENTE, SENHA_EMAIL)
+            s.send_message(msg)
     except:
         pass
+
+# =========================
+# LISTAS
+# =========================
+CATEGORIAS = [
+"Limpeza","Remuneração Sócios","Alimentação","Telefonia e Internet",
+"Software E Licenças - Informática","Transportes / Logística",
+"Material de Escritório","Equipamentos de Informática",
+"Estacionamento","Móveis e Utensílios",
+"Despesas de Viagens","Máquinas e Equipamentos"
+]
+
+CENTROS = [
+"CREDENCIAMENTO","REDE","DIRETORIA",
+"DUARTE GESTÃO","MARKETING","FINANCEIRO"
+]
 
 # =========================
 # DB
@@ -111,12 +108,11 @@ def connect():
     os.makedirs("uploads", exist_ok=True)
     return sqlite3.connect("banco.db", check_same_thread=False)
 
-def criar_tabelas():
+def criar():
     conn = connect()
-
     conn.execute("""
     CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY,
         nome TEXT,
         usuario TEXT,
         email TEXT,
@@ -124,51 +120,57 @@ def criar_tabelas():
         admin INTEGER
     )
     """)
-
     conn.execute("""
     CREATE TABLE IF NOT EXISTS despesas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY,
         usuario TEXT,
         descricao TEXT,
         categoria TEXT,
         centro TEXT,
         valor REAL,
+        arquivos TEXT,
         status TEXT,
         data_criacao TEXT,
         data_pagamento TEXT
     )
     """)
-
     conn.commit()
     conn.close()
 
 def criar_admin():
     conn = connect()
-    senha_hash = bcrypt.hashpw("123456".encode(), bcrypt.gensalt()).decode()
+    senha = bcrypt.hashpw("123456".encode(), bcrypt.gensalt()).decode()
     try:
         conn.execute("INSERT INTO usuarios VALUES (NULL,?,?,?,?,?)",
-                     ("Admin","admin","admin@email.com",senha_hash,1))
+                     ("Admin","admin","admin@email.com",senha,1))
         conn.commit()
     except:
         pass
     conn.close()
 
-criar_tabelas()
+criar()
 criar_admin()
 
 # =========================
 # AUTH
 # =========================
-def verificar_senha(senha, hash):
-    return bcrypt.checkpw(senha.encode(), hash.encode())
-
-def login(user, senha):
+def login(u,s):
     conn = connect()
-    r = conn.execute("SELECT * FROM usuarios WHERE usuario=?", (user,)).fetchone()
+    r = conn.execute("SELECT * FROM usuarios WHERE usuario=?", (u,)).fetchone()
     conn.close()
-    if r and verificar_senha(senha, r[4]):
+    if r and bcrypt.checkpw(s.encode(), r[4].encode()):
         return r
-    return None
+
+def criar_user(nome,u,e,s):
+    conn = connect()
+    senha = bcrypt.hashpw(s.encode(), bcrypt.gensalt()).decode()
+    try:
+        conn.execute("INSERT INTO usuarios VALUES (NULL,?,?,?,?,?)",
+                     (nome,u,e,senha,0))
+        conn.commit()
+        return True
+    except:
+        return False
 
 # =========================
 # SESSION
@@ -177,49 +179,50 @@ if "logado" not in st.session_state:
     st.session_state["logado"] = False
 
 # =========================
-# LOGIN
+# LOGIN + CADASTRO
 # =========================
 if not st.session_state["logado"]:
 
-    u = st.text_input("Usuário")
-    s = st.text_input("Senha", type="password")
+    tab1,tab2 = st.tabs(["Login","Criar Conta"])
 
-    if st.button("Entrar"):
-        r = login(u,s)
-        if r:
-            st.session_state["logado"]=True
-            st.session_state["usuario"]=r[2]
-            st.session_state["admin"]=r[5]
-            st.session_state["nome"]=r[1]
-            st.session_state["email"]=r[3]
-            st.rerun()
+    with tab1:
+        u = st.text_input("Usuário")
+        s = st.text_input("Senha", type="password")
+        if st.button("Entrar"):
+            r = login(u,s)
+            if r:
+                st.session_state["logado"]=True
+                st.session_state["usuario"]=r[2]
+                st.session_state["admin"]=r[5]
+                st.session_state["nome"]=r[1]
+                st.session_state["email"]=r[3]
+                st.rerun()
+
+    with tab2:
+        n = st.text_input("Nome")
+        u = st.text_input("Usuário")
+        e = st.text_input("Email")
+        s = st.text_input("Senha", type="password")
+        if st.button("Criar Conta"):
+            if criar_user(n,u,e,s):
+                st.success("Conta criada!")
 
     st.stop()
 
 # =========================
-# SIDEBAR LOGO
+# MENU
 # =========================
-st.sidebar.markdown("""
-<a href="https://www.duartegestao.com.br/index.html" target="_blank">
-<img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="160">
-</a>
-""", unsafe_allow_html=True)
-
 menu = st.sidebar.radio("Menu", ["Dashboard","Despesas","Reembolsos"])
 
 # =========================
 # DASHBOARD
 # =========================
 if menu == "Dashboard":
-
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
-
     if not df.empty:
-        st.metric("Total", f"R$ {df['valor'].sum():.2f}")
         st.plotly_chart(px.pie(df, names="categoria", values="valor"))
         st.plotly_chart(px.bar(df, x="centro", y="valor"))
-
     conn.close()
 
 # =========================
@@ -227,61 +230,116 @@ if menu == "Dashboard":
 # =========================
 elif menu == "Despesas":
 
-    desc = st.text_input("Descrição")
-    valor = st.number_input("Valor")
+    tab1,tab2 = st.tabs(["Nova","Minhas"])
 
-    if st.button("Enviar"):
-        conn = connect()
-        conn.execute("""
-        INSERT INTO despesas VALUES (NULL,?,?,?,?,?,?,?,?)
-        """,(st.session_state["usuario"],desc,"Outros","FINANCEIRO",valor,
-             "PENDENTE",datetime.now(),None))
-        conn.commit()
+    # NOVA
+    with tab1:
+        desc = st.text_input("Descrição")
+        valor = st.number_input("Valor")
+        cat = st.selectbox("Categoria", CATEGORIAS)
+        centro = st.selectbox("Centro", CENTROS)
+        arquivos = st.file_uploader("Arquivos", accept_multiple_files=True)
+
+        if st.button("Enviar"):
+            lista=[]
+            for arq in arquivos:
+                path=f"uploads/{arq.name}"
+                with open(path,"wb") as f:
+                    f.write(arq.read())
+                lista.append(path)
+
+            conn=connect()
+            conn.execute("""
+            INSERT INTO despesas VALUES (NULL,?,?,?,?,?,?,?,?,?)
+            """,(st.session_state["usuario"],desc,cat,centro,valor,
+                 ",".join(lista),"PENDENTE",datetime.now(),None))
+            conn.commit()
+            conn.close()
+            st.success("Enviado!")
+
+    # MINHAS
+    with tab2:
+        conn=connect()
+        df=pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'",conn)
+
+        for _,row in df.iterrows():
+            st.markdown('<div class="card">',unsafe_allow_html=True)
+
+            st.write(row["descricao"],row["valor"],row["status"])
+
+            # anexos
+            if row["arquivos"]:
+                for arq in row["arquivos"].split(","):
+                    if arq.endswith((".png",".jpg",".jpeg")):
+                        st.image(arq,width=200)
+                    elif arq.endswith(".pdf"):
+                        with open(arq,"rb") as f:
+                            st.download_button("PDF",f,file_name=arq,key=f"pdf_{row['id']}")
+
+            col1,col2=st.columns(2)
+
+            if col1.button("Excluir",key=f"del_{row['id']}"):
+                conn.execute("DELETE FROM despesas WHERE id=?", (row["id"],))
+                conn.commit()
+                st.rerun()
+
+            if col2.button("Editar",key=f"edit_{row['id']}"):
+                st.warning("Edição em breve")
+
+            st.markdown('</div>',unsafe_allow_html=True)
+
         conn.close()
-        st.success("Enviado!")
 
 # =========================
-# REEMBOLSOS
+# REEMBOLSOS ADMIN
 # =========================
 elif menu == "Reembolsos":
 
     if not st.session_state["admin"]:
         st.stop()
 
-    conn = connect()
-    df = pd.read_sql("SELECT * FROM despesas", conn)
+    conn=connect()
+    df=pd.read_sql("SELECT * FROM despesas",conn)
+
+    # filtros
+    user=st.selectbox("Usuário",["Todos"]+list(df["usuario"].unique()))
+    status=st.selectbox("Status",["Todos","PENDENTE","PAGO"])
+
+    if user!="Todos":
+        df=df[df["usuario"]==user]
+    if status!="Todos":
+        df=df[df["status"]==status]
 
     for _,row in df.iterrows():
+        st.markdown('<div class="card">',unsafe_allow_html=True)
 
-        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.write(row["usuario"],row["descricao"],row["valor"])
+        st.write("Criado:",row["data_criacao"])
+        st.write("Pago:",row["data_pagamento"])
 
-        st.write(f"👤 {row['usuario']}")
-        st.write(f"📌 {row['descricao']}")
-        st.write(f"💰 R$ {row['valor']}")
-        st.write(f"📊 Status: {row['status']}")
-        st.write(f"🕒 Criado em: {row['data_criacao']}")
-        st.write(f"💸 Pago em: {row['data_pagamento']}")
+        # anexos preview
+        if row["arquivos"]:
+            for arq in row["arquivos"].split(","):
+                if arq.endswith((".png",".jpg",".jpeg")):
+                    st.image(arq,width=200)
+                elif arq.endswith(".pdf"):
+                    with open(arq,"rb") as f:
+                        st.download_button("PDF",f,file_name=arq,key=f"pdf_admin_{row['id']}")
 
-        col1,col2 = st.columns(2)
+        if st.button("Pagar",key=f"pay_{row['id']}"):
 
-        if col1.button("💰 Pagar", key=f"pg_{row['id']}"):
-            user = conn.execute("SELECT nome,email FROM usuarios WHERE usuario=?",
-                                (row["usuario"],)).fetchone()
+            user_data=conn.execute("SELECT nome,email FROM usuarios WHERE usuario=?",
+                                   (row["usuario"],)).fetchone()
 
-            if user:
-                enviar_email(user[1], user[0], row["descricao"], row["valor"], row["categoria"])
+            if user_data:
+                enviar_email(user_data[1],user_data[0],
+                             row["descricao"],row["valor"],row["categoria"])
 
-            conn.execute("UPDATE despesas SET status='PAGO', data_pagamento=? WHERE id=?",
-                         (datetime.now(), row["id"]))
+            conn.execute("UPDATE despesas SET status='PAGO',data_pagamento=? WHERE id=?",
+                         (datetime.now(),row["id"]))
             conn.commit()
+            st.success("Pago!")
 
-            st.success("Pago + Email enviado!")
-
-        if col2.button("❌ Excluir", key=f"del_{row['id']}"):
-            conn.execute("DELETE FROM despesas WHERE id=?", (row["id"],))
-            conn.commit()
-            st.rerun()
-
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>',unsafe_allow_html=True)
 
     conn.close()
