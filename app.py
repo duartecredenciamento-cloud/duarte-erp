@@ -11,21 +11,51 @@ from email.mime.text import MIMEText
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# 🔥 LOGO TOPO
+# 🎨 ESTILO PROFISSIONAL
+# =========================
+st.markdown("""
+<style>
+body {
+    background: linear-gradient(135deg,#0f172a,#020617);
+    color: #e2e8f0;
+}
+.card {
+    background: #1e293b;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:15px;
+    animation: fadeIn 0.5s ease-in;
+}
+@keyframes fadeIn {
+    from {opacity:0; transform:translateY(10px);}
+    to {opacity:1; transform:translateY(0);}
+}
+button[kind="primary"] {
+    border-radius:10px;
+    transition:0.3s;
+}
+button[kind="primary"]:hover {
+    transform:scale(1.05);
+}
+</style>
+""", unsafe_allow_html=True)
+
+# =========================
+# 🔥 LOGO
 # =========================
 st.markdown("""
 <div style="text-align:center;">
-    <a href="https://www.duartegestao.com.br/index.html" target="_blank">
-        <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="220">
-    </a>
+<a href="https://www.duartegestao.com.br/index.html" target="_blank">
+<img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="220">
+</a>
 </div>
 """, unsafe_allow_html=True)
 
 # =========================
-# CONFIG EMAIL
+# 📧 EMAIL CONFIG
 # =========================
 EMAIL_REMETENTE = "financeiro.duartegestao@gmail.com"
-SENHA_EMAIL = "SUA_SENHA_APP_AQUI"
+SENHA_EMAIL = "aywd uklm zpkl mqgr"
 
 def enviar_email(destinatario, nome, descricao, valor, categoria):
     try:
@@ -83,7 +113,6 @@ def criar_tabelas():
         usuario TEXT,
         descricao TEXT,
         categoria TEXT,
-        centro_custo TEXT,
         valor REAL,
         arquivos TEXT,
         status TEXT DEFAULT 'PENDENTE',
@@ -155,17 +184,17 @@ if "logado" not in st.session_state:
     st.session_state["logado"] = False
 
 # =========================
-# LOGIN / CADASTRO
+# LOGIN
 # =========================
 if not st.session_state["logado"]:
 
     abas = st.tabs(["Login", "Criar Conta"])
 
     with abas[0]:
-        user = st.text_input("Usuário", key="login_user")
-        senha = st.text_input("Senha", type="password", key="login_senha")
+        user = st.text_input("Usuário")
+        senha = st.text_input("Senha", type="password")
 
-        if st.button("Entrar", key="btn_login"):
+        if st.button("Entrar"):
             r = login(user, senha)
             if r:
                 st.session_state["logado"] = True
@@ -176,12 +205,12 @@ if not st.session_state["logado"]:
                 st.rerun()
 
     with abas[1]:
-        nome = st.text_input("Nome completo", key="cad_nome")
-        user = st.text_input("Usuário", key="cad_user")
-        email = st.text_input("Email", key="cad_email")
-        senha = st.text_input("Senha", type="password", key="cad_senha")
+        nome = st.text_input("Nome")
+        user = st.text_input("Usuário")
+        email = st.text_input("Email")
+        senha = st.text_input("Senha", type="password")
 
-        if st.button("Criar Conta", key="btn_criar"):
+        if st.button("Criar Conta"):
             if criar_usuario(nome, user, email, senha):
                 st.success("Conta criada!")
             else:
@@ -190,21 +219,14 @@ if not st.session_state["logado"]:
     st.stop()
 
 # =========================
-# SIDEBAR LOGO
+# MENU
 # =========================
-st.sidebar.markdown("""
-<a href="https://www.duartegestao.com.br/index.html" target="_blank">
-    <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="150">
-</a>
-""", unsafe_allow_html=True)
-
 menu = st.sidebar.radio("Menu", ["Dashboard", "Despesas", "Reembolsos"])
 
 # =========================
 # DASHBOARD
 # =========================
 if menu == "Dashboard":
-
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
@@ -212,7 +234,7 @@ if menu == "Dashboard":
 
     if not df.empty:
         st.plotly_chart(px.pie(df, names="categoria", values="valor"))
-        st.plotly_chart(px.bar(df, x="centro_custo", y="valor"))
+        st.plotly_chart(px.bar(df, x="usuario", y="valor"))
 
     conn.close()
 
@@ -223,22 +245,13 @@ elif menu == "Despesas":
 
     tab1, tab2 = st.tabs(["Nova", "Minhas"])
 
-    categorias = [
-        "Limpeza","Remuneração Sócios","Alimentação","Telefonia e Internet",
-        "Software e Licenças","Transportes","Material Escritório",
-        "Equipamentos","Estacionamento","Móveis","Viagens","Máquinas"
-    ]
-
-    centros = ["FINANCEIRO","MARKETING","DIRETORIA","REDE","DUARTE GESTÃO","CREDENCIAMENTO"]
-
     with tab1:
-        desc = st.text_input("Descrição", key="desc")
-        valor = st.number_input("Valor", key="valor")
-        categoria = st.selectbox("Categoria", categorias, key="cat")
-        centro = st.selectbox("Centro de custo", centros, key="centro")
-        arquivos = st.file_uploader("Arquivos", accept_multiple_files=True, key="file")
+        desc = st.text_input("Descrição")
+        valor = st.number_input("Valor")
+        categoria = st.text_input("Categoria")
+        arquivos = st.file_uploader("Arquivos", accept_multiple_files=True)
 
-        if st.button("Enviar", key="btn_env"):
+        if st.button("Enviar"):
             lista = []
             for arq in arquivos:
                 path = f"uploads/{arq.name}"
@@ -248,9 +261,9 @@ elif menu == "Despesas":
 
             conn = connect()
             conn.execute("""
-            INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """, (st.session_state["usuario"], desc, categoria, centro, valor, ",".join(lista)))
+            INSERT INTO despesas (usuario, descricao, categoria, valor, arquivos)
+            VALUES (?, ?, ?, ?, ?)
+            """, (st.session_state["usuario"], desc, categoria, valor, ",".join(lista)))
             conn.commit()
             conn.close()
 
@@ -263,7 +276,7 @@ elif menu == "Despesas":
         for i, row in df.iterrows():
             st.write(f"{row['descricao']} - R$ {row['valor']}")
 
-            if st.button("Excluir", key=f"del_{i}"):
+            if st.button("Excluir", key=f"del_{row['id']}"):
                 conn.execute("DELETE FROM despesas WHERE id=?", (row["id"],))
                 conn.commit()
                 st.rerun()
@@ -275,7 +288,8 @@ elif menu == "Despesas":
 # =========================
 elif menu == "Reembolsos":
 
-    if st.session_state["tipo"] not in ["admin", "financeiro", "operacional"]:
+    if st.session_state["tipo"] not in ["admin", "financeiro"]:
+        st.error("Acesso restrito")
         st.stop()
 
     conn = connect()
@@ -283,11 +297,23 @@ elif menu == "Reembolsos":
 
     for i, row in df.iterrows():
 
-        st.write(f"👤 {row['usuario']} | 💰 {row['valor']} | {row['status']}")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+
+        st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
         st.write(f"📅 Criado: {row['data_criacao']}")
         st.write(f"💸 Pago: {row['data_pagamento']}")
 
-        if st.button("Pagar", key=f"pagar_{i}"):
+        col1, col2, col3 = st.columns(3)
+
+        if col1.button("Aprovar", key=f"ap_{row['id']}"):
+            conn.execute("UPDATE despesas SET status='APROVADO' WHERE id=?", (row["id"],))
+            conn.commit()
+
+        if col2.button("Rejeitar", key=f"rej_{row['id']}"):
+            conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?", (row["id"],))
+            conn.commit()
+
+        if col3.button("Pagar", key=f"pg_{row['id']}"):
 
             c = conn.cursor()
             c.execute("SELECT nome, email FROM usuarios WHERE usuario=?", (row["usuario"],))
@@ -302,5 +328,7 @@ elif menu == "Reembolsos":
             conn.commit()
 
             st.success("Pago + Email enviado!")
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     conn.close()
