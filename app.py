@@ -11,10 +11,21 @@ from email.mime.text import MIMEText
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
+# 🔥 LOGO TOPO
+# =========================
+st.markdown("""
+<div style="text-align:center;">
+    <a href="https://www.duartegestao.com.br/index.html" target="_blank">
+        <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="220">
+    </a>
+</div>
+""", unsafe_allow_html=True)
+
+# =========================
 # CONFIG EMAIL
 # =========================
 EMAIL_REMETENTE = "financeiro.duartegestao@gmail.com"
-SENHA_EMAIL = "aywd uklm zpkl mqgr"
+SENHA_EMAIL = "SUA_SENHA_APP_AQUI"
 
 def enviar_email(destinatario, nome, descricao, valor, categoria):
     try:
@@ -129,7 +140,7 @@ def criar_usuario(nome, user, email, senha):
     senha_hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
     try:
         conn.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?, ?, ?)",
-                     (nome, user, email, senha_hash, "operacional"))
+                     (nome, user, email, senha_hash, "usuario"))
         conn.commit()
         return True
     except:
@@ -144,7 +155,7 @@ if "logado" not in st.session_state:
     st.session_state["logado"] = False
 
 # =========================
-# LOGIN
+# LOGIN / CADASTRO
 # =========================
 if not st.session_state["logado"]:
 
@@ -154,7 +165,7 @@ if not st.session_state["logado"]:
         user = st.text_input("Usuário", key="login_user")
         senha = st.text_input("Senha", type="password", key="login_senha")
 
-        if st.button("Entrar"):
+        if st.button("Entrar", key="btn_login"):
             r = login(user, senha)
             if r:
                 st.session_state["logado"] = True
@@ -165,30 +176,39 @@ if not st.session_state["logado"]:
                 st.rerun()
 
     with abas[1]:
-        nome = st.text_input("Nome", key="cad_nome")
+        nome = st.text_input("Nome completo", key="cad_nome")
         user = st.text_input("Usuário", key="cad_user")
         email = st.text_input("Email", key="cad_email")
         senha = st.text_input("Senha", type="password", key="cad_senha")
 
-        if st.button("Criar Conta"):
+        if st.button("Criar Conta", key="btn_criar"):
             if criar_usuario(nome, user, email, senha):
                 st.success("Conta criada!")
+            else:
+                st.error("Erro ao criar")
 
     st.stop()
 
 # =========================
-# MENU
+# SIDEBAR LOGO
 # =========================
+st.sidebar.markdown("""
+<a href="https://www.duartegestao.com.br/index.html" target="_blank">
+    <img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="150">
+</a>
+""", unsafe_allow_html=True)
+
 menu = st.sidebar.radio("Menu", ["Dashboard", "Despesas", "Reembolsos"])
 
 # =========================
 # DASHBOARD
 # =========================
 if menu == "Dashboard":
+
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
-    st.title("Dashboard")
+    st.title("📊 Dashboard")
 
     if not df.empty:
         st.plotly_chart(px.pie(df, names="categoria", values="valor"))
@@ -205,9 +225,8 @@ elif menu == "Despesas":
 
     categorias = [
         "Limpeza","Remuneração Sócios","Alimentação","Telefonia e Internet",
-        "Software E Licenças - Informática","Transportes / Logística",
-        "Material de Escritório","Equipamentos de Informática","Estacionamento",
-        "Móveis e Utensílios","Despesas de Viagens","Máquinas e Equipamentos"
+        "Software e Licenças","Transportes","Material Escritório",
+        "Equipamentos","Estacionamento","Móveis","Viagens","Máquinas"
     ]
 
     centros = ["FINANCEIRO","MARKETING","DIRETORIA","REDE","DUARTE GESTÃO","CREDENCIAMENTO"]
@@ -215,17 +234,26 @@ elif menu == "Despesas":
     with tab1:
         desc = st.text_input("Descrição", key="desc")
         valor = st.number_input("Valor", key="valor")
-        categoria = st.selectbox("Categoria", categorias)
-        centro = st.selectbox("Centro de custo", centros)
+        categoria = st.selectbox("Categoria", categorias, key="cat")
+        centro = st.selectbox("Centro de custo", centros, key="centro")
+        arquivos = st.file_uploader("Arquivos", accept_multiple_files=True, key="file")
 
-        if st.button("Enviar"):
+        if st.button("Enviar", key="btn_env"):
+            lista = []
+            for arq in arquivos:
+                path = f"uploads/{arq.name}"
+                with open(path, "wb") as f:
+                    f.write(arq.read())
+                lista.append(path)
+
             conn = connect()
             conn.execute("""
-            INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor)
-            VALUES (?, ?, ?, ?, ?)
-            """, (st.session_state["usuario"], desc, categoria, centro, valor))
+            INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (st.session_state["usuario"], desc, categoria, centro, valor, ",".join(lista)))
             conn.commit()
             conn.close()
+
             st.success("Enviado!")
 
     with tab2:
@@ -248,7 +276,6 @@ elif menu == "Despesas":
 elif menu == "Reembolsos":
 
     if st.session_state["tipo"] not in ["admin", "financeiro", "operacional"]:
-        st.error("Acesso restrito")
         st.stop()
 
     conn = connect()
@@ -256,7 +283,9 @@ elif menu == "Reembolsos":
 
     for i, row in df.iterrows():
 
-        st.write(f"{row['usuario']} - {row['descricao']} - R$ {row['valor']}")
+        st.write(f"👤 {row['usuario']} | 💰 {row['valor']} | {row['status']}")
+        st.write(f"📅 Criado: {row['data_criacao']}")
+        st.write(f"💸 Pago: {row['data_pagamento']}")
 
         if st.button("Pagar", key=f"pagar_{i}"):
 
