@@ -259,10 +259,42 @@ elif menu == "Despesas":
 
     tab1, tab2 = st.tabs(["Nova", "Minhas"])
 
+    # ✅ CATEGORIAS EMPRESA
+    categorias = [
+        "Limpeza",
+        "Remuneração Sócios",
+        "Alimentação",
+        "Telefonia e Internet",
+        "Software e Licenças - Informática",
+        "Transportes / Logística",
+        "Material de Escritório",
+        "Equipamentos de Informática",
+        "Estacionamento",
+        "Móveis e Utensílios",
+        "Despesas de Viagens",
+        "Máquinas e Equipamentos"
+    ]
+
+    # ✅ CENTRO DE CUSTO
+    centros = [
+        "CREDENCIAMENTO",
+        "REDE",
+        "DIRETORIA",
+        "DUARTE GESTÃO",
+        "MARKETING",
+        "FINANCEIRO"
+    ]
+
+    # =========================
+    # ➕ NOVA DESPESA
+    # =========================
     with tab1:
         desc = st.text_input("Descrição", key="desc")
         valor = st.number_input("Valor", key="valor")
-        categoria = st.text_input("Categoria", key="cat")
+
+        categoria = st.selectbox("Categoria", categorias, key="cat")
+        centro = st.selectbox("Centro de Custo", centros, key="centro")
+
         arquivos = st.file_uploader("Arquivos", accept_multiple_files=True, key="upload")
 
         if st.button("Enviar", key="btn_env"):
@@ -275,25 +307,59 @@ elif menu == "Despesas":
 
             conn = connect()
             conn.execute("""
-            INSERT INTO despesas (usuario, descricao, categoria, valor, arquivos)
-            VALUES (?, ?, ?, ?, ?)
-            """, (st.session_state["usuario"], desc, categoria, valor, ",".join(lista)))
+            INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (st.session_state["usuario"], desc, categoria, centro, valor, ",".join(lista)))
             conn.commit()
             conn.close()
 
-            st.success("Enviado!")
+            st.success("Despesa enviada!")
 
+    # =========================
+    # 👤 MINHAS DESPESAS
+    # =========================
     with tab2:
         conn = connect()
-        df = pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'", conn)
+        df = pd.read_sql(
+            f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'",
+            conn
+        )
 
         for _, row in df.iterrows():
-            st.write(f"{row['descricao']} - R$ {row['valor']}")
+            st.markdown("### 📄 Despesa")
+            st.write(f"📌 {row['descricao']}")
+            st.write(f"💰 R$ {row['valor']}")
+            st.write(f"🏷️ {row['categoria']} | 🏢 {row['centro_custo']}")
+            st.write(f"📅 {row['data_criacao']}")
 
-            if st.button("Excluir", key=f"del_{row['id']}"):
+            col1, col2 = st.columns(2)
+
+            # ❌ EXCLUIR
+            if col1.button("Excluir", key=f"del_{row['id']}"):
                 conn.execute("DELETE FROM despesas WHERE id=?", (row["id"],))
                 conn.commit()
                 st.rerun()
+
+            # ✏️ EDITAR
+            if col2.button("Editar", key=f"edit_{row['id']}"):
+                st.session_state["editando"] = row["id"]
+
+            # ✏️ FORM EDIT
+            if st.session_state.get("editando") == row["id"]:
+                new_desc = st.text_input("Nova descrição", value=row["descricao"], key=f"ed_desc_{row['id']}")
+                new_valor = st.number_input("Novo valor", value=row["valor"], key=f"ed_val_{row['id']}")
+                new_cat = st.selectbox("Categoria", categorias, index=categorias.index(row["categoria"]), key=f"ed_cat_{row['id']}")
+                new_centro = st.selectbox("Centro", centros, index=centros.index(row["centro_custo"]), key=f"ed_centro_{row['id']}")
+
+                if st.button("Salvar", key=f"save_{row['id']}"):
+                    conn.execute("""
+                    UPDATE despesas
+                    SET descricao=?, valor=?, categoria=?, centro_custo=?
+                    WHERE id=?
+                    """, (new_desc, new_valor, new_cat, new_centro, row["id"]))
+                    conn.commit()
+                    st.session_state["editando"] = None
+                    st.rerun()
 
         conn.close()
 
