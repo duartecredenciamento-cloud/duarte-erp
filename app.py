@@ -16,7 +16,7 @@ st.set_page_config(page_title="Duarte Gestão", layout="wide")
 EMAIL_REMETENTE = "financeiro.duartegestao@gmail.com"
 SENHA_EMAIL = "aywd uklm zpkl mqgr"
 
-def enviar_email(destinatario, nome, descricao, valor, categoria):
+def enviar_email(destinatario, nome, descricao, valor, categoria, centros):
     try:
         corpo = f"""
 Olá {nome},
@@ -210,8 +210,8 @@ elif menu == "Despesas":
 
     tab1, tab2 = st.tabs(["Nova", "Minhas"])
 
-    categorias = ["Limpeza","Alimentação","Transporte","Software"]
-    centros = ["FINANCEIRO","MARKETING","DIRETORIA","REDE"]
+    categorias = ["Limpeza","Remuneração", "Sócios", "Alimentação", "Telefonia e Internet", "Software E Licenças - Informática",  "Transportes / Logística" "Material de Escritório", "Equipamentos de Informática", "Estacionamento", "Móveis e Utensílios", "Despesas de Viagens Máquinas e Equipamentos"]
+    centros = ["FINANCEIRO","MARKETING","DIRETORIA","REDE","DUARTE GESTÃO","CREDENCIAMENTO"]
 
     # NOVA
     with tab1:
