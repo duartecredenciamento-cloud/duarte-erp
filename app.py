@@ -11,86 +11,30 @@ from email.mime.text import MIMEText
 st.set_page_config(page_title="Duarte Gestão", layout="wide")
 
 # =========================
-# 🎨 ESTILO PROFISSIONAL
-# =========================
-st.markdown("""
-<style>
-body {
-    background: linear-gradient(135deg,#020617,#0f172a);
-    color: #e2e8f0;
-}
-
-/* LOGO HOVER */
-.logo img {
-    transition: 0.3s;
-}
-.logo img:hover {
-    transform: scale(1.08);
-}
-
-/* BOTÕES */
-.stButton button {
-    background: linear-gradient(90deg,#2563eb,#06b6d4);
-    border-radius: 10px;
-    color: white;
-    font-weight: bold;
-    border: none;
-    transition: 0.3s;
-}
-.stButton button:hover {
-    transform: scale(1.05);
-    box-shadow: 0px 0px 15px rgba(37,99,235,0.6);
-}
-
-/* CARDS */
-.card {
-    background: linear-gradient(145deg,#1e293b,#020617);
-    padding:20px;
-    border-radius:15px;
-    margin-bottom:15px;
-    animation: fadeIn 0.5s ease-in;
-}
-
-@keyframes fadeIn {
-    from {opacity:0; transform:translateY(10px);}
-    to {opacity:1; transform:translateY(0);}
-}
-</style>
-""", unsafe_allow_html=True)
-
-# =========================
-# 🔥 LOGO TOPO
-# =========================
-st.markdown("""
-<div class="logo" style="text-align:center;">
-<a href="https://www.duartegestao.com.br/index.html" target="_blank">
-<img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="230">
-</a>
-</div>
-""", unsafe_allow_html=True)
-
-# =========================
 # EMAIL CONFIG
 # =========================
-EMAIL_REMETENTE = "SEUEMAIL@gmail.com"
-SENHA_EMAIL = "SENHA_APP"
+EMAIL_REMETENTE = "financeiro.duartegestao@gmail.com"
+SENHA_EMAIL = "apqc vzxq isvs yfuz"
 
 def enviar_email(destinatario, nome, descricao, valor, categoria):
     corpo = f"""
 Olá {nome},
 
-Seu reembolso foi pago com sucesso!
+🎉 SEU REEMBOLSO FOI PAGO!
 
-Descrição: {descricao}
-Categoria: {categoria}
-Valor: R$ {valor}
+📌 Descrição: {descricao}
+📂 Categoria: {categoria}
+💰 Valor: R$ {valor}
 
-Não responda este e-mail.
+Seu pagamento já foi realizado com sucesso.
 
+⚠️ Este é um e-mail automático, não responda.
+
+Atenciosamente,  
 Duarte Gestão 🚀
 """
     msg = MIMEText(corpo)
-    msg["Subject"] = "Reembolso Pago"
+    msg["Subject"] = "💰 Reembolso Pago - Duarte Gestão"
     msg["From"] = EMAIL_REMETENTE
     msg["To"] = destinatario
 
@@ -99,8 +43,24 @@ Duarte Gestão 🚀
             server.starttls()
             server.login(EMAIL_REMETENTE, SENHA_EMAIL)
             server.send_message(msg)
-    except:
-        pass
+    except Exception as e:
+        st.error(f"Erro ao enviar email: {e}")
+
+# =========================
+# LISTAS
+# =========================
+CATEGORIAS = [
+"Limpeza","Remuneração Sócios","Alimentação","Telefonia e Internet",
+"Software E Licenças - Informática","Transportes / Logística",
+"Material de Escritório","Equipamentos de Informática",
+"Estacionamento","Móveis e Utensílios",
+"Despesas de Viagens","Máquinas e Equipamentos"
+]
+
+CENTROS = [
+"CREDENCIAMENTO","REDE","DIRETORIA",
+"DUARTE GESTÃO","MARKETING","FINANCEIRO"
+]
 
 # =========================
 # DB
@@ -132,7 +92,6 @@ def criar_tabelas():
         centro TEXT,
         valor REAL,
         status TEXT,
-        data_criacao TEXT,
         data_pagamento TEXT
     )
     """)
@@ -219,38 +178,19 @@ if not st.session_state["logado"]:
     st.stop()
 
 # =========================
-# SIDEBAR LOGO
+# MENU
 # =========================
-st.sidebar.markdown("""
-<a href="https://www.duartegestao.com.br/index.html" target="_blank">
-<img src="https://www.duartegestao.com.br/images/logo-duartegestao.png" width="180">
-</a>
-""", unsafe_allow_html=True)
-
 menu = st.sidebar.radio("Menu", ["Dashboard","Despesas","Reembolsos"])
 
 # =========================
-# DASHBOARD TOP
+# DASHBOARD
 # =========================
 if menu == "Dashboard":
-
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
-    st.title("📊 Dashboard Financeiro")
-
     if not df.empty:
-
-        col1, col2 = st.columns(2)
-        col1.metric("💰 Total", f"R$ {df['valor'].sum():.2f}")
-        col2.metric("📄 Registros", len(df))
-
         st.plotly_chart(px.pie(df, names="categoria", values="valor"))
-        st.plotly_chart(px.bar(df, x="usuario", y="valor"))
-
-        # 🔥 CENTRO DE CUSTO
-        st.subheader("Centro de Custos")
-        st.plotly_chart(px.pie(df, names="centro", values="valor"))
         st.plotly_chart(px.bar(df, x="centro", y="valor"))
 
     conn.close()
@@ -260,42 +200,19 @@ if menu == "Dashboard":
 # =========================
 elif menu == "Despesas":
 
-    tab1, tab2 = st.tabs(["Nova","Minhas"])
+    desc = st.text_input("Descrição")
+    valor = st.number_input("Valor")
+    categoria = st.selectbox("Categoria", CATEGORIAS)
+    centro = st.selectbox("Centro de Custo", CENTROS)
 
-    with tab1:
-        desc = st.text_input("Descrição")
-        valor = st.number_input("Valor")
-        categoria = st.selectbox("Categoria",
-            ["Limpeza","Alimentação","Transporte","Software"])
-        centro = st.selectbox("Centro",
-            ["FINANCEIRO","MARKETING","DIRETORIA","REDE"])
-
-        if st.button("Enviar"):
-            conn = connect()
-            conn.execute("""
-            INSERT INTO despesas VALUES (NULL,?,?,?,?,?,?,?,?)
-            """,(st.session_state["usuario"],desc,categoria,centro,valor,
-                 "PENDENTE",datetime.now(),None))
-            conn.commit()
-            conn.close()
-            st.success("Enviado!")
-
-    with tab2:
+    if st.button("Enviar"):
         conn = connect()
-        df = pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'", conn)
-
-        for _,row in df.iterrows():
-            st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.write(row["descricao"], row["valor"], row["status"])
-
-            if st.button("Excluir", key=f"del_{row['id']}"):
-                conn.execute("DELETE FROM despesas WHERE id=?", (row["id"],))
-                conn.commit()
-                st.rerun()
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
+        conn.execute("""
+        INSERT INTO despesas VALUES (NULL,?,?,?,?,?,?,?)
+        """,(st.session_state["usuario"],desc,categoria,centro,valor,"PENDENTE",None))
+        conn.commit()
         conn.close()
+        st.success("Enviado!")
 
 # =========================
 # REEMBOLSOS
@@ -310,23 +227,23 @@ elif menu == "Reembolsos":
 
     for _,row in df.iterrows():
 
-        st.markdown('<div class="card">', unsafe_allow_html=True)
         st.write(row["usuario"], row["descricao"], row["valor"], row["status"])
 
         if st.button("Pagar", key=f"pg_{row['id']}"):
 
-            user = conn.execute("SELECT nome,email FROM usuarios WHERE usuario=?",
-                                (row["usuario"],)).fetchone()
+            user = conn.execute(
+                "SELECT nome,email FROM usuarios WHERE usuario=?",
+                (row["usuario"],)
+            ).fetchone()
 
             if user:
                 enviar_email(user[1], user[0], row["descricao"], row["valor"], row["categoria"])
 
-            conn.execute("UPDATE despesas SET status='PAGO', data_pagamento=? WHERE id=?",
-                         (datetime.now(), row["id"]))
+            conn.execute("""
+            UPDATE despesas SET status='PAGO', data_pagamento=? WHERE id=?
+            """,(datetime.now(), row["id"]))
+
             conn.commit()
-
             st.success("Pago + Email enviado!")
-
-        st.markdown('</div>', unsafe_allow_html=True)
 
     conn.close()
