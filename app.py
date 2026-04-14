@@ -19,61 +19,28 @@ st.markdown("""
 /* SIDEBAR */
 section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, #020617, #0f172a);
-    border-right: 1px solid rgba(255,255,255,0.05);
 }
 
-/* MENU CONTAINER */
-div[role="radiogroup"] {
-    margin-top: 20px;
-}
-
-/* BOTÕES */
+/* MENU */
 div[role="radiogroup"] label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 14px;
-    margin-bottom: 8px;
-    border-radius: 12px;
-    cursor: pointer;
-    font-size: 15px;
+    padding: 12px;
+    margin-bottom: 6px;
+    border-radius: 10px;
+    transition: 0.2s;
     color: #cbd5e1;
-    transition: all 0.25s ease;
-    position: relative;
 }
 
 /* HOVER */
 div[role="radiogroup"] label:hover {
-    background: rgba(59,130,246,0.12);
-    transform: translateX(8px);
+    background: rgba(59,130,246,0.15);
+    transform: translateX(5px);
 }
 
-/* ATIVO */
+/* ATIVO (SEM QUEBRAR STREAMLIT) */
 div[role="radiogroup"] input:checked + div {
-    background: linear-gradient(90deg,#2563eb,#1d4ed8);
-    color: #fff;
-    font-weight: 600;
-    transform: scale(1.03);
-    box-shadow: 0 0 20px rgba(37,99,235,0.5);
-}
-
-/* LINHA LATERAL ANIMADA */
-div[role="radiogroup"] input:checked + div::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 5px;
-    height: 100%;
-    background: #60a5fa;
-    border-radius: 0 4px 4px 0;
-    animation: pulseBar 1s infinite alternate;
-}
-
-/* ANIMAÇÃO */
-@keyframes pulseBar {
-    from { opacity: 0.4; }
-    to { opacity: 1; }
+    background: #2563eb !important;
+    color: white !important;
+    border-radius: 10px;
 }
 
 /* CLICK */
@@ -81,19 +48,9 @@ div[role="radiogroup"] label:active {
     transform: scale(0.95);
 }
 
-/* BADGE (bolinha tipo notificação) */
-.menu-badge {
-    margin-left: auto;
-    background: #ef4444;
-    color: white;
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 8px;
-}
-
-/* TRANSIÇÃO GLOBAL */
+/* TRANSIÇÃO */
 html, body, [class*="css"] {
-    transition: all 0.25s ease-in-out;
+    transition: all 0.2s ease-in-out;
 }
 
 </style>
@@ -284,7 +241,7 @@ menu = st.sidebar.radio(
 # =========================
 # DASHBOARD
 # =========================
-if menu == "Dashboard":
+if menu == "dashboard":
 
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
@@ -300,7 +257,7 @@ if menu == "Dashboard":
 # =========================
 # DESPESAS
 # =========================
-elif menu == "Despesas":
+elif menu == "despesas":
 
     tab1, tab2 = st.tabs(["Nova", "Minhas"])
 
@@ -376,7 +333,7 @@ elif menu == "Despesas":
 # =========================
 # REEMBOLSOS
 # =========================
-elif menu == "Reembolsos":
+elif menu == "reembolsos":
 
     if st.session_state["tipo"] not in ["admin", "financeiro", "operacional"]:
         st.stop()
