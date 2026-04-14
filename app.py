@@ -133,7 +133,12 @@ if "logado" not in st.session_state:
 # =========================
 menu = st.sidebar.radio(
     "",
-    ["dashboard", "despesas", "reembolsos"]
+    ["dashboard", "despesas", "reembolsos"],
+    format_func=lambda x: {
+        "dashboard": "📊 Dashboard",
+        "despesas": "💸 Despesas",
+        "reembolsos": "💰 Reembolsos"
+    }[x]
 )
 
 # =========================
