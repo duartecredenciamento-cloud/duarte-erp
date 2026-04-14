@@ -15,23 +15,87 @@ st.set_page_config(page_title="Duarte Gestão", layout="wide")
 # =========================
 st.markdown("""
 <style>
-body {background: linear-gradient(135deg,#020617,#0f172a); color:#e2e8f0;}
-section[data-testid="stSidebar"] {background:#020617;}
-.card {
-    background:#1e293b;
-    padding:20px;
-    border-radius:12px;
-    margin-bottom:15px;
-    animation: fadeIn 0.4s ease-in;
+
+/* SIDEBAR */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #020617, #0f172a);
+    border-right: 1px solid rgba(255,255,255,0.05);
 }
-@keyframes fadeIn {
-    from {opacity:0; transform:translateY(10px);}
-    to {opacity:1; transform:translateY(0);}
+
+/* MENU CONTAINER */
+div[role="radiogroup"] {
+    margin-top: 20px;
 }
-button[kind="primary"] {
-    border-radius:10px;
+
+/* BOTÕES */
+div[role="radiogroup"] label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 15px;
+    color: #cbd5e1;
+    transition: all 0.25s ease;
+    position: relative;
 }
-button:hover {transform:scale(1.05);}
+
+/* HOVER */
+div[role="radiogroup"] label:hover {
+    background: rgba(59,130,246,0.12);
+    transform: translateX(8px);
+}
+
+/* ATIVO */
+div[role="radiogroup"] input:checked + div {
+    background: linear-gradient(90deg,#2563eb,#1d4ed8);
+    color: #fff;
+    font-weight: 600;
+    transform: scale(1.03);
+    box-shadow: 0 0 20px rgba(37,99,235,0.5);
+}
+
+/* LINHA LATERAL ANIMADA */
+div[role="radiogroup"] input:checked + div::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: 100%;
+    background: #60a5fa;
+    border-radius: 0 4px 4px 0;
+    animation: pulseBar 1s infinite alternate;
+}
+
+/* ANIMAÇÃO */
+@keyframes pulseBar {
+    from { opacity: 0.4; }
+    to { opacity: 1; }
+}
+
+/* CLICK */
+div[role="radiogroup"] label:active {
+    transform: scale(0.95);
+}
+
+/* BADGE (bolinha tipo notificação) */
+.menu-badge {
+    margin-left: auto;
+    background: #ef4444;
+    color: white;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 8px;
+}
+
+/* TRANSIÇÃO GLOBAL */
+html, body, [class*="css"] {
+    transition: all 0.25s ease-in-out;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -207,7 +271,15 @@ if not st.session_state["logado"]:
 # =========================
 # MENU
 # =========================
-menu = st.sidebar.radio("Menu", ["Dashboard", "Despesas", "Reembolsos"])
+menu = st.sidebar.radio(
+    "",
+    ["dashboard", "despesas", "reembolsos"],
+    format_func=lambda x: {
+        "dashboard": "📊  Dashboard",
+        "despesas": "💸  Despesas",
+        "reembolsos": "💰  Reembolsos"
+    }[x]
+)
 
 # =========================
 # DASHBOARD
