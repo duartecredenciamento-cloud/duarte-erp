@@ -23,34 +23,32 @@ section[data-testid="stSidebar"] {
 
 /* MENU */
 div[role="radiogroup"] label {
-    padding: 12px;
-    margin-bottom: 6px;
-    border-radius: 10px;
-    transition: 0.2s;
-    color: #cbd5e1;
+    padding: 14px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    transition: all 0.25s ease;
+    cursor: pointer;
+    font-size: 15px;
 }
 
 /* HOVER */
 div[role="radiogroup"] label:hover {
-    background: rgba(59,130,246,0.15);
-    transform: translateX(5px);
+    background: rgba(37,99,235,0.2);
+    transform: translateX(6px);
 }
 
-/* ATIVO (SEM QUEBRAR STREAMLIT) */
+/* ATIVO */
 div[role="radiogroup"] input:checked + div {
-    background: #2563eb !important;
-    color: white !important;
-    border-radius: 10px;
+    background: linear-gradient(90deg,#2563eb,#1d4ed8);
+    color: white;
+    font-weight: bold;
+    transform: scale(1.02);
+    box-shadow: 0 0 12px rgba(37,99,235,0.6);
 }
 
-/* CLICK */
+/* ANIMAÇÃO */
 div[role="radiogroup"] label:active {
     transform: scale(0.95);
-}
-
-/* TRANSIÇÃO */
-html, body, [class*="css"] {
-    transition: all 0.2s ease-in-out;
 }
 
 </style>
@@ -226,18 +224,26 @@ if not st.session_state["logado"]:
     st.stop()
 
 # =========================
-# MENU
+# MENU NIVEL BANCO 🔥
 # =========================
+
 menu = st.sidebar.radio(
-    "",
+    "📌 Navegação",
     ["dashboard", "despesas", "reembolsos"],
     format_func=lambda x: {
-        "dashboard": "📊  Dashboard",
-        "despesas": "💸  Despesas",
-        "reembolsos": "💰  Reembolsos"
+        "dashboard": "📊 Dashboard",
+        "despesas": "💸 Despesas",
+        "reembolsos": "💰 Reembolsos"
     }[x]
 )
 
+st.sidebar.markdown("---")
+st.sidebar.markdown(f"👤 {st.session_state['nome']}")
+st.sidebar.markdown(f"🏷️ {st.session_state['tipo']}")
+
+if st.sidebar.button("🚪 Sair"):
+    st.session_state.clear()
+    st.rerun()
 # =========================
 # DASHBOARD
 # =========================
