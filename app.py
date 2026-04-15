@@ -48,14 +48,20 @@ div[role="radiogroup"] input:checked + div {
 
 /* CARD PADRÃO (REEMBOLSO + DESPESA) */
 .card {
-    background: #0f172a;
+    background: var(--secondary-background-color);
     padding: 18px;
     border-radius: 14px;
     margin-bottom: 12px;
     transition: all 0.3s ease;
     animation: fadeIn 0.4s ease-in-out;
+    color: var(--text-color);
+    border: 1px solid rgba(128,128,128,0.2);
 }
 
+.card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
 .card:hover {
     transform: translateY(-5px) scale(1.02);
     box-shadow: 0 10px 25px rgba(0,0,0,0.4);
@@ -278,9 +284,7 @@ menu = st.sidebar.radio(
     }[x]
 )
 
-# =========================
-# DASHBOARD
-# =========================
+
 # =========================
 # DASHBOARD
 # =========================
