@@ -537,47 +537,40 @@ elif menu == "reembolsos":
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas ORDER BY id DESC", conn)
 
-    # 📎 ARQUIVOS
-    arquivos = row["arquivos"].split(",")
-
-    st.markdown("📎 **Arquivos anexados:**")
-
-    for i, arq in enumerate(arquivos):
-
-        if os.path.exists(arq):
-
-            nome_arquivo = os.path.basename(arq)
-
-            # IMAGEM
-            if arq.lower().endswith((".png", ".jpg", ".jpeg")):
-                st.image(arq, caption=nome_arquivo, width=250)
-
-            # PDF
-            elif arq.lower().endswith(".pdf"):
-                with open(arq, "rb") as f:
-                    st.download_button(
-                        label=f"📄 Baixar PDF - {nome_arquivo}",
-                        data=f,
-                        file_name=nome_arquivo,
-                        key=f"pdf_{row['id']}_{i}"
-                    )
-
-                st.info("👆 Clique para baixar o PDF")
-
-            # OUTROS ARQUIVOS
-            else:
-                with open(arq, "rb") as f:
-                    st.download_button(
-                        label=f"📎 Baixar arquivo - {nome_arquivo}",
-                        data=f,
-                        file_name=nome_arquivo,
-                        key=f"file_{row['id']}_{i}"
-                    )
+    for _, row in df.iterrows():
 
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
         st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
         st.write(f"📅 {row['data_criacao']}")
+
+        # ✅ ARQUIVOS (AGORA CERTO)
+        if row["arquivos"]:
+            arquivos = row["arquivos"].split(",")
+
+            for arq in arquivos:
+                if os.path.exists(arq):
+
+                    if arq.endswith(".pdf"):
+                        with open(arq, "rb") as f:
+                            st.download_button(
+                                "📄 PDF",
+                                f,
+                                file_name=os.path.basename(arq),
+                                key=f"pdf_{row['id']}_{arq}"
+                            )
+
+                    elif arq.endswith((".png", ".jpg", ".jpeg")):
+                        st.image(arq, width=200)
+
+                    else:
+                        with open(arq, "rb") as f:
+                            st.download_button(
+                                "📎 Arquivo",
+                                f,
+                                file_name=os.path.basename(arq),
+                                key=f"file_{row['id']}_{arq}"
+                            )
 
         col1, col2, col3 = st.columns(3)
 
