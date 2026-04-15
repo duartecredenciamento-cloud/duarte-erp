@@ -117,7 +117,7 @@ st.markdown("""
 # 📧 EMAIL
 # =========================
 EMAIL_REMETENTE = "financeiro.duartegestao@gmail.com"
-SENHA_EMAIL = "adre gnlu xrmg eheu"
+SENHA_EMAIL = "hgxe wlet rwdg nzov"
 
 def enviar_email(destinatario, nome, descricao, valor, categoria):
     try:
