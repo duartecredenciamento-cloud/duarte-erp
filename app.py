@@ -281,16 +281,92 @@ menu = st.sidebar.radio(
 # =========================
 # DASHBOARD
 # =========================
+# =========================
+# DASHBOARD
+# =========================
 if menu == "dashboard":
+
+    import time
+
+    with st.spinner("Carregando dashboard..."):
+        time.sleep(1)
 
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas", conn)
 
+    st.markdown('<div class="dashboard">', unsafe_allow_html=True)
+
     st.title("📊 Dashboard")
 
     if not df.empty:
-        st.plotly_chart(px.pie(df, names="categoria", values="valor"), use_container_width=True)
-        st.plotly_chart(px.bar(df, x="centro_custo", y="valor"), use_container_width=True)
+
+        # =========================
+        # 🔥 KPIs (CARDS)
+        # =========================
+        total = df["valor"].sum()
+        qtd = len(df)
+        media = df["valor"].mean()
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.markdown(f'''
+        <div class="card">
+            💰 Total<br>
+            <h2>R$ {total:.2f}</h2>
+        </div>
+        ''', unsafe_allow_html=True)
+
+        col2.markdown(f'''
+        <div class="card">
+            📊 Média<br>
+            <h2>R$ {media:.2f}</h2>
+        </div>
+        ''', unsafe_allow_html=True)
+
+        col3.markdown(f'''
+        <div class="card">
+            📦 Registros<br>
+            <h2>{qtd}</h2>
+        </div>
+        ''', unsafe_allow_html=True)
+
+        # =========================
+        # 📊 GRÁFICO DONUT
+        # =========================
+        st.subheader("📊 Despesas por Categoria")
+
+        fig1 = px.pie(
+            df,
+            names="categoria",
+            values="valor",
+            hole=0.5
+        )
+
+        fig1.update_traces(textinfo='percent+label')
+        fig1.update_layout(showlegend=True)
+
+        st.plotly_chart(fig1, use_container_width=True)
+
+        # =========================
+        # 📊 GRÁFICO BARRAS
+        # =========================
+        st.subheader("🏢 Gastos por Centro de Custo")
+
+        fig2 = px.bar(
+            df,
+            x="centro_custo",
+            y="valor",
+            text_auto=True
+        )
+
+        fig2.update_layout(hovermode="x unified")
+
+        st.plotly_chart(fig2, use_container_width=True)
+
+    else:
+        st.info("Nenhuma despesa cadastrada ainda.")
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
     conn.close()
 
