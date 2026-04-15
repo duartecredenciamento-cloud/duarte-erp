@@ -238,8 +238,8 @@ if not st.session_state["logado"]:
     abas = st.tabs(["Login", "Criar Conta"])
 
     with abas[0]:
-        user = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
+        user = st.text_input("Usuário", key="login_user")
+        senha = st.text_input("Senha", type="password", key="login_pass")
 
         if st.button("Entrar"):
             r = login(user, senha)
@@ -252,10 +252,10 @@ if not st.session_state["logado"]:
                 st.rerun()
 
     with abas[1]:
-        nome = st.text_input("Nome")
-        user = st.text_input("Usuário")
-        email = st.text_input("Email")
-        senha = st.text_input("Senha", type="password")
+        nome = st.text_input("Nome", key="cad_nome")
+        user = st.text_input("Usuário", key="cad_user")
+        email = st.text_input("Email", key="cad_email")
+        senha = st.text_input("Senha", type="password", key="cad_pass")
 
         if st.button("Criar Conta"):
             conn = connect()
