@@ -382,34 +382,52 @@ elif menu == "despesas":
     tab1, tab2 = st.tabs(["Nova", "Minhas"])
 
     categorias = [
-        "Limpeza","Remuneração Sócios","Alimentação","Telefonia e Internet",
-        "Software E Licenças - Informática","Transportes / Logística",
-        "Material de Escritório","Equipamentos de Informática",
-        "Estacionamento","Móveis e Utensílios",
-        "Despesas de Viagens","Máquinas e Equipamentos"
+        "Limpeza",
+        "Remuneração Sócios",
+        "Alimentação",
+        "Telefonia e Internet",
+        "Software E Licenças - Informática",
+        "Transportes / Logística",
+        "Material de Escritório",
+        "Equipamentos de Informática",
+        "Estacionamento",
+        "Móveis e Utensílios",
+        "Despesas de Viagens",
+        "Máquinas e Equipamentos"
     ]
 
     centros = [
-        "CREDENCIAMENTO","REDE","DIRETORIA",
-        "DUARTE GESTÃO","MARKETING","FINANCEIRO"
+        "CREDENCIAMENTO",
+        "REDE",
+        "DIRETORIA",
+        "DUARTE GESTÃO",
+        "MARKETING",
+        "FINANCEIRO"
     ]
 
-    # NOVA DESPESA
+    # =========================
+    # 🆕 NOVA DESPESA
+    # =========================
     with tab1:
 
         desc = st.text_input("Descrição")
         valor = st.number_input("Valor")
+
         categoria = st.selectbox("Categoria", categorias)
         centro = st.selectbox("Centro de Custo", centros)
-        arquivos = st.file_uploader("Anexos", accept_multiple_files=True)
+
+        arquivos = st.file_uploader(
+            "📎 Anexar arquivos",
+            accept_multiple_files=True
+        )
 
         if st.button("Enviar"):
 
             lista = []
 
             if arquivos:
-                for arq in arquivos:
-                    nome = f"{datetime.now().timestamp()}_{arq.name}"
+                for i, arq in enumerate(arquivos):
+                    nome = f"{datetime.now().timestamp()}_{i}_{arq.name}"
                     caminho = os.path.join("uploads", nome)
 
                     with open(caminho, "wb") as f:
@@ -430,14 +448,80 @@ elif menu == "despesas":
             st.balloons()
             st.rerun()
 
-    # MINHAS
+    # =========================
+    # 📋 MINHAS DESPESAS
+    # =========================
     with tab2:
 
         conn = connect()
-        df = pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'", conn)
+        df = pd.read_sql(f"""
+            SELECT * FROM despesas 
+            WHERE usuario='{st.session_state["usuario"]}'
+            ORDER BY id DESC
+        """, conn)
 
         for _, row in df.iterrows():
-            st.markdown(f'<div class="card">{row["descricao"]} - R$ {row["valor"]}</div>', unsafe_allow_html=True)
+
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+
+            st.write(f"💸 {row['descricao']} - R$ {row['valor']}")
+            st.write(f"📌 {row['categoria']} | {row['centro_custo']} | {row['status']}")
+
+            # 📎 ARQUIVOS
+            if row["arquivos"]:
+                arquivos = row["arquivos"].split(",")
+
+                for i, arq in enumerate(arquivos):
+                    if os.path.exists(arq):
+
+                        if arq.lower().endswith((".png", ".jpg", ".jpeg")):
+                            st.image(arq, width=150)
+
+                        else:
+                            with open(arq, "rb") as f:
+                                st.download_button(
+                                    "📎 Baixar",
+                                    f,
+                                    file_name=os.path.basename(arq),
+                                    key=f"down_{row['id']}_{i}"
+                                )
+
+            # 🔥 BOTÕES
+            col1, col2 = st.columns(2)
+
+            # ❌ EXCLUIR
+            if col1.button("❌ Excluir", key=f"del_{row['id']}"):
+                conn.execute("DELETE FROM despesas WHERE id=?", (row["id"],))
+                conn.commit()
+                st.rerun()
+
+            # ✏️ EDITAR
+            if col2.button("✏️ Editar", key=f"edit_{row['id']}"):
+                st.session_state["editando"] = row["id"]
+
+            # 🔥 FORM DE EDIÇÃO
+            if st.session_state.get("editando") == row["id"]:
+
+                nova_desc = st.text_input("Nova descrição", value=row["descricao"], key=f"desc_{row['id']}")
+                novo_valor = st.number_input("Novo valor", value=row["valor"], key=f"val_{row['id']}")
+                nova_cat = st.selectbox("Categoria", categorias, index=categorias.index(row["categoria"]), key=f"cat_{row['id']}")
+                novo_centro = st.selectbox("Centro", centros, index=centros.index(row["centro_custo"]), key=f"cent_{row['id']}")
+
+                if st.button("💾 Salvar", key=f"save_{row['id']}"):
+
+                    conn.execute("""
+                        UPDATE despesas
+                        SET descricao=?, valor=?, categoria=?, centro_custo=?
+                        WHERE id=?
+                    """, (nova_desc, novo_valor, nova_cat, novo_centro, row["id"]))
+
+                    conn.commit()
+
+                    st.success("Atualizado!")
+                    st.session_state["editando"] = None
+                    st.rerun()
+
+            st.markdown('</div>', unsafe_allow_html=True)
 
         conn.close()
 
@@ -453,7 +537,42 @@ elif menu == "reembolsos":
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas ORDER BY id DESC", conn)
 
-    for _, row in df.iterrows():
+    # 📎 ARQUIVOS
+    arquivos = row["arquivos"].split(",")
+
+    st.markdown("📎 **Arquivos anexados:**")
+
+    for i, arq in enumerate(arquivos):
+
+        if os.path.exists(arq):
+
+            nome_arquivo = os.path.basename(arq)
+
+            # IMAGEM
+            if arq.lower().endswith((".png", ".jpg", ".jpeg")):
+                st.image(arq, caption=nome_arquivo, width=250)
+
+            # PDF
+            elif arq.lower().endswith(".pdf"):
+                with open(arq, "rb") as f:
+                    st.download_button(
+                        label=f"📄 Baixar PDF - {nome_arquivo}",
+                        data=f,
+                        file_name=nome_arquivo,
+                        key=f"pdf_{row['id']}_{i}"
+                    )
+
+                st.info("👆 Clique para baixar o PDF")
+
+            # OUTROS ARQUIVOS
+            else:
+                with open(arq, "rb") as f:
+                    st.download_button(
+                        label=f"📎 Baixar arquivo - {nome_arquivo}",
+                        data=f,
+                        file_name=nome_arquivo,
+                        key=f"file_{row['id']}_{i}"
+                    )
 
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
