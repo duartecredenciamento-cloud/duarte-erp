@@ -119,33 +119,39 @@ st.markdown("""
 EMAIL_REMETENTE = "financeiro.duartegestao@gmail.com"
 SENHA_EMAIL = "hgxe wlet rwdg nzov"
 
-def enviar_email(destinatario, nome, descricao, valor, categoria):
+def enviar_email(destinatario, nome, descricao, valor, categoria, centro_custo, data_pagamento):
     try:
         corpo = f"""
 Olá {nome},
 
 Seu reembolso foi aprovado e pago com sucesso!
 
-Descrição: {descricao}
-Categoria: {categoria}
-Valor: R$ {valor}
+📄 Descrição: {descricao}
+📂 Categoria: {categoria}
+🏢 Centro de Custo: {centro_custo}
+💰 Valor: R$ {valor}
+📅 Data do Pagamento: {data_pagamento}
 
 ⚠️ NÃO RESPONDER ESTE EMAIL
 
 Duarte Gestão
 """
+
         msg = MIMEText(corpo)
         msg["Subject"] = "💰 Reembolso Pago"
         msg["From"] = EMAIL_REMETENTE
         msg["To"] = destinatario
 
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(EMAIL_REMETENTE, SENHA_EMAIL)
-            server.send_message(msg)
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(EMAIL_REMETENTE, SENHA_EMAIL)
+        server.send_message(msg)
+        server.quit()
+
+        st.success("📧 Email enviado!")
 
     except Exception as e:
-        st.error(f"Erro email: {e}")
+        st.error(f"❌ Erro ao enviar email: {e}")
 
 # =========================
 # DB
@@ -585,12 +591,34 @@ elif menu == "reembolsos":
             st.rerun()
 
         if col3.button("💰 Pagar", key=f"pg_{row['id']}"):
-            conn.execute("UPDATE despesas SET status='PAGO' WHERE id=?", (row["id"],))
-            conn.commit()
-            st.success("Pago!")
-            st.balloons()
-            st.rerun()
 
-        st.markdown('</div>', unsafe_allow_html=True)
+                c = conn.cursor()
+    c.execute("SELECT nome, email FROM usuarios WHERE usuario=?", (row["usuario"],))
+    user_data = c.fetchone()
+
+    if user_data:
+        nome, email = user_data
+
+        data_pagamento = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+        enviar_email(
+            email,
+            nome,
+            row["descricao"],
+            row["valor"],
+            row["categoria"],
+            row["centro_custo"],
+            data_pagamento
+        )
+
+    conn.execute("UPDATE despesas SET status='PAGO', data_pagamento=? WHERE id=?",
+                 (datetime.now(), row["id"]))
+    conn.commit()
+
+    st.success("Pago + Email enviado!")
+    st.balloons()
+    st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
     conn.close()
