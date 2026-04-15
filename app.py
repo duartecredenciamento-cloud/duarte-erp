@@ -302,29 +302,21 @@ elif menu == "despesas":
     tab1, tab2 = st.tabs(["Nova", "Minhas"])
 
     categorias = [
-    "Limpeza",
-    "Remuneração Sócios",
-    "Alimentação",
-    "Telefonia e Internet",
-    "Software E Licenças - Informática",
-    "Transportes / Logística",
-    "Material de Escritório",
-    "Equipamentos de Informática",
-    "Estacionamento",
-    "Móveis e Utensílios",
-    "Despesas de Viagens",
-    "Máquinas e Equipamentos"
-]
-    centros = [
-    "CREDENCIAMENTO",
-    "REDE",
-    "DIRETORIA",
-    "DUARTE GESTÃO",
-    "MARKETING",
-    "FINANCEIRO"
-]
+        "Limpeza","Remuneração Sócios","Alimentação","Telefonia e Internet",
+        "Software E Licenças - Informática","Transportes / Logística",
+        "Material de Escritório","Equipamentos de Informática",
+        "Estacionamento","Móveis e Utensílios",
+        "Despesas de Viagens","Máquinas e Equipamentos"
+    ]
 
+    centros = [
+        "CREDENCIAMENTO","REDE","DIRETORIA",
+        "DUARTE GESTÃO","MARKETING","FINANCEIRO"
+    ]
+
+    # NOVA DESPESA
     with tab1:
+
         desc = st.text_input("Descrição")
         valor = st.number_input("Valor")
         categoria = st.selectbox("Categoria", categorias)
@@ -333,43 +325,9 @@ elif menu == "despesas":
 
         if st.button("Enviar"):
 
-            lista= []
+            lista = []
 
-    if arquivos:
-        for arq in arquivos:
-            nome = f"{datetime.now().timestamp()}_{arq.name}"
-            caminho = os.path.join("uploads", nome)
-
-            with open(caminho, "wb") as f:
-                f.write(arq.read())
-
-            lista.append(caminho)
-
-    if arquivos:
-        for arq in arquivos:
-            nome = f"{datetime.now().timestamp()}_{arq.name}"
-            caminho = os.path.join("uploads", nome)
-
-            with open(caminho, "wb") as f:
-                f.write(arq.read())
-
-            lista.append(caminho)
-
-    conn = connect()
-    conn.execute("""
-        INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (st.session_state["usuario"], desc, categoria, centro, valor, ",".join(lista)))
-
-    conn.commit()
-    conn.close()
-
-    st.markdown('<div class="success-check">✔ Enviado com sucesso!</div>', unsafe_allow_html=True)
-    st.balloons()
-    st.rerun()
-    lista = []
-
-    if arquivos:
+            if arquivos:
                 for arq in arquivos:
                     nome = f"{datetime.now().timestamp()}_{arq.name}"
                     caminho = os.path.join("uploads", nome)
@@ -379,22 +337,27 @@ elif menu == "despesas":
 
                     lista.append(caminho)
 
-    conn = connect()
-    conn.execute("""
-            INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
-            VALUES (?, ?, ?, ?, ?, ?)
+            conn = connect()
+            conn.execute("""
+                INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (st.session_state["usuario"], desc, categoria, centro, valor, ",".join(lista)))
-    conn.commit()
-    conn.close()
 
-    st.success("Enviado!")
+            conn.commit()
+            conn.close()
 
+            st.markdown('<div class="success-check">✔ Enviado com sucesso!</div>', unsafe_allow_html=True)
+            st.balloons()
+            st.rerun()
+
+    # MINHAS
     with tab2:
+
         conn = connect()
         df = pd.read_sql(f"SELECT * FROM despesas WHERE usuario='{st.session_state['usuario']}'", conn)
 
         for _, row in df.iterrows():
-            st.write(f"{row['descricao']} - R$ {row['valor']}")
+            st.markdown(f'<div class="card">{row["descricao"]} - R$ {row["valor"]}</div>', unsafe_allow_html=True)
 
         conn.close()
 
@@ -412,30 +375,30 @@ elif menu == "reembolsos":
 
     for _, row in df.iterrows():
 
-       st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
-    st.write(f"📅 {row['data_criacao']}")
+        st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
+        st.write(f"📅 {row['data_criacao']}")
 
-    col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = st.columns(3)
 
-    if col1.button("✅ Aprovar", key=f"ap_{row['id']}"):
-        conn.execute("UPDATE despesas SET status='APROVADO' WHERE id=?", (row["id"],))
-        conn.commit()
-        st.rerun()
+        if col1.button("✅ Aprovar", key=f"ap_{row['id']}"):
+            conn.execute("UPDATE despesas SET status='APROVADO' WHERE id=?", (row["id"],))
+            conn.commit()
+            st.rerun()
 
-    if col2.button("❌ Rejeitar", key=f"rej_{row['id']}"):
-        conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?", (row["id"],))
-        conn.commit()
-        st.rerun()
+        if col2.button("❌ Rejeitar", key=f"rej_{row['id']}"):
+            conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?", (row["id"],))
+            conn.commit()
+            st.rerun()
 
-    if col3.button("💰 Pagar", key=f"pg_{row['id']}"):
-        conn.execute("UPDATE despesas SET status='PAGO' WHERE id=?", (row["id"],))
-        conn.commit()
-        st.success("Pago!")
-        st.balloons()
-        st.rerun()
+        if col3.button("💰 Pagar", key=f"pg_{row['id']}"):
+            conn.execute("UPDATE despesas SET status='PAGO' WHERE id=?", (row["id"],))
+            conn.commit()
+            st.success("Pago!")
+            st.balloons()
+            st.rerun()
 
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     conn.close()
