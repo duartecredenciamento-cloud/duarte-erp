@@ -16,40 +16,81 @@ st.set_page_config(page_title="Duarte Gestão", layout="wide")
 st.markdown("""
 <style>
 
-/* LOADING BAR */
-.loading-bar {
-    width: 100%;
-    height: 6px;
-    background: #1e293b;
+/* SIDEBAR */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #020617, #0f172a);
+    border-right: 1px solid rgba(255,255,255,0.05);
+}
+
+/* MENU */
+div[role="radiogroup"] label {
+    display: flex;
+    align-items: center;
+    padding: 14px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+div[role="radiogroup"] label:hover {
+    background: rgba(59,130,246,0.15);
+    transform: translateX(8px);
+}
+
+div[role="radiogroup"] input:checked + div {
+    background: linear-gradient(90deg,#2563eb,#1d4ed8);
+    color: #fff;
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(37,99,235,0.5);
+}
+
+/* CARD PADRÃO (REEMBOLSO + DESPESA) */
+.card {
+    background: #0f172a;
+    padding: 18px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+    animation: fadeIn 0.4s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+}
+
+/* ANIMAÇÃO ENTRADA */
+@keyframes fadeIn {
+    from {opacity: 0; transform: translateY(15px);}
+    to {opacity: 1; transform: translateY(0);}
+}
+
+/* BOTÕES */
+.stButton>button {
     border-radius: 10px;
-    overflow: hidden;
-    margin-top: 10px;
+    transition: 0.2s;
 }
 
-.loading-bar::after {
-    content: "";
-    display: block;
-    width: 40%;
-    height: 100%;
-    background: linear-gradient(90deg,#3b82f6,#60a5fa);
-    animation: loading 1s infinite;
+.stButton>button:hover {
+    transform: scale(1.05);
 }
 
-@keyframes loading {
-    0% { margin-left: -40%; }
-    100% { margin-left: 100%; }
-}
-
-/* SUCCESS CHECK */
+/* SUCESSO ANIMADO */
 .success-check {
-    font-size: 22px;
-    color: #22c55e;
-    animation: pop 0.4s ease;
+    background: linear-gradient(90deg,#22c55e,#16a34a);
+    padding: 12px;
+    border-radius: 10px;
+    color: white;
+    text-align: center;
+    font-weight: bold;
+    animation: pop 0.3s ease;
 }
 
 @keyframes pop {
-    0% { transform: scale(0.5); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
+    from {transform: scale(0.8); opacity: 0;}
+    to {transform: scale(1); opacity: 1;}
 }
 
 </style>
@@ -369,111 +410,32 @@ elif menu == "reembolsos":
     conn = connect()
     df = pd.read_sql("SELECT * FROM despesas ORDER BY id DESC", conn)
 
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
 
-        status = row["status"]
+       st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        classe = {
-            "PENDENTE": "status-pendente",
-            "APROVADO": "status-aprovado",
-            "PAGO": "status-pago",
-            "REJEITADO": "status-rejeitado"
-        }.get(status, "status")
+    st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
+    st.write(f"📅 {row['data_criacao']}")
 
-        cor_valor = "valor-positivo" if status == "PAGO" else "valor-negativo"
+    col1, col2, col3 = st.columns(3)
 
-        st.markdown('<div class="card">', unsafe_allow_html=True)
+    if col1.button("✅ Aprovar", key=f"ap_{row['id']}"):
+        conn.execute("UPDATE despesas SET status='APROVADO' WHERE id=?", (row["id"],))
+        conn.commit()
+        st.rerun()
 
-        # HEADER
-        st.markdown(f"""
-        <div style="display:flex; justify-content:space-between;">
-            <div>👤 <b>{row['usuario']}</b></div>
-            <div class="status {classe}">{status}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    if col2.button("❌ Rejeitar", key=f"rej_{row['id']}"):
+        conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?", (row["id"],))
+        conn.commit()
+        st.rerun()
 
-        # INFO
-        st.markdown(f"""
-        <div style="margin-top:8px;">
-            📄 {row['descricao']}
-        </div>
-        """, unsafe_allow_html=True)
+    if col3.button("💰 Pagar", key=f"pg_{row['id']}"):
+        conn.execute("UPDATE despesas SET status='PAGO' WHERE id=?", (row["id"],))
+        conn.commit()
+        st.success("Pago!")
+        st.balloons()
+        st.rerun()
 
-        st.markdown(f"""
-        <div class="valor {cor_valor}">
-            💰 R$ {row['valor']}
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.caption(f"📅 Criado: {row['data_criacao']}")
-        st.caption(f"💸 Pago: {row['data_pagamento']}")
-
-        # 📎 ARQUIVOS
-        if row["arquivos"]:
-            arquivos = row["arquivos"].split(",")
-
-            for arq in arquivos:
-                if os.path.exists(arq):
-
-                    if arq.endswith(".pdf"):
-                        with open(arq, "rb") as f:
-                            st.download_button(
-                                "📄 PDF",
-                                f,
-                                file_name=os.path.basename(arq),
-                                key=f"pdf_{row['id']}_{i}"
-                            )
-
-                    elif arq.endswith((".png",".jpg",".jpeg")):
-                        st.image(arq, width=200)
-
-                    else:
-                        with open(arq, "rb") as f:
-                            st.download_button(
-                                "📎 Arquivo",
-                                f,
-                                file_name=os.path.basename(arq),
-                                key=f"file_{row['id']}_{i}"
-                            )
-
-        col1, col2, col3 = st.columns(3)
-
-        # ✅ APROVAR
-        if col1.button("Aprovar", key=f"ap_{row['id']}_{i}"):
-            conn.execute("UPDATE despesas SET status='APROVADO' WHERE id=?", (row["id"],))
-            conn.commit()
-            st.rerun()
-
-        # ❌ REJEITAR
-        if col2.button("Rejeitar", key=f"rej_{row['id']}_{i}"):
-            conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?", (row["id"],))
-            conn.commit()
-            st.rerun()
-
-        # 💰 PAGAR
-        if col3.button("Pagar", key=f"pg_{row['id']}_{i}"):
-
-            c = conn.cursor()
-            c.execute("SELECT nome, email FROM usuarios WHERE usuario=?", (row["usuario"],))
-            user_data = c.fetchone()
-
-            if user_data:
-                nome, email = user_data
-                enviar_email(email, nome, row["descricao"], row["valor"], row["categoria"])
-
-            conn.execute("""
-                UPDATE despesas 
-                SET status='PAGO', data_pagamento=? 
-                WHERE id=?
-            """, (datetime.now(), row["id"]))
-
-            conn.commit()
-
-            st.success("💸 Pago com sucesso + Email enviado!")
-            st.balloons()
-
-            st.rerun()
-
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     conn.close()
