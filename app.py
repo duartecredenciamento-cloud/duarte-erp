@@ -16,32 +16,40 @@ st.set_page_config(page_title="Duarte Gestão", layout="wide")
 st.markdown("""
 <style>
 
-/* SIDEBAR */
-section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #020617, #0f172a);
-    border-right: 1px solid rgba(255,255,255,0.05);
-}
-
-/* MENU */
-div[role="radiogroup"] {
-    margin-top: 20px;
-}
-
-div[role="radiogroup"] label {
-    display: flex;
-    align-items: center;
-    padding: 12px;
-    margin-bottom: 8px;
+/* LOADING BAR */
+.loading-bar {
+    width: 100%;
+    height: 6px;
+    background: #1e293b;
     border-radius: 10px;
-    cursor: pointer;
-    font-size: 15px;
-    color: #cbd5e1;
-    transition: all 0.2s ease;
+    overflow: hidden;
+    margin-top: 10px;
 }
 
-div[role="radiogroup"] label:hover {
-    background: rgba(59,130,246,0.15);
-    transform: translateX(6px);
+.loading-bar::after {
+    content: "";
+    display: block;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(90deg,#3b82f6,#60a5fa);
+    animation: loading 1s infinite;
+}
+
+@keyframes loading {
+    0% { margin-left: -40%; }
+    100% { margin-left: 100%; }
+}
+
+/* SUCCESS CHECK */
+.success-check {
+    font-size: 22px;
+    color: #22c55e;
+    animation: pop 0.4s ease;
+}
+
+@keyframes pop {
+    0% { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
 }
 
 </style>
@@ -252,8 +260,28 @@ elif menu == "despesas":
 
     tab1, tab2 = st.tabs(["Nova", "Minhas"])
 
-    categorias = ["Limpeza","Remuneração Sócios","Alimentação"]
-    centros = ["CREDENCIAMENTO","REDE","FINANCEIRO"]
+    categorias = [
+    "Limpeza",
+    "Remuneração Sócios",
+    "Alimentação",
+    "Telefonia e Internet",
+    "Software E Licenças - Informática",
+    "Transportes / Logística",
+    "Material de Escritório",
+    "Equipamentos de Informática",
+    "Estacionamento",
+    "Móveis e Utensílios",
+    "Despesas de Viagens",
+    "Máquinas e Equipamentos"
+]
+    centros = [
+    "CREDENCIAMENTO",
+    "REDE",
+    "DIRETORIA",
+    "DUARTE GESTÃO",
+    "MARKETING",
+    "FINANCEIRO"
+]
 
     with tab1:
         desc = st.text_input("Descrição")
@@ -263,9 +291,44 @@ elif menu == "despesas":
         arquivos = st.file_uploader("Anexos", accept_multiple_files=True)
 
         if st.button("Enviar"):
-            lista = []
 
-            if arquivos:
+            lista= []
+
+    if arquivos:
+        for arq in arquivos:
+            nome = f"{datetime.now().timestamp()}_{arq.name}"
+            caminho = os.path.join("uploads", nome)
+
+            with open(caminho, "wb") as f:
+                f.write(arq.read())
+
+            lista.append(caminho)
+
+    if arquivos:
+        for arq in arquivos:
+            nome = f"{datetime.now().timestamp()}_{arq.name}"
+            caminho = os.path.join("uploads", nome)
+
+            with open(caminho, "wb") as f:
+                f.write(arq.read())
+
+            lista.append(caminho)
+
+    conn = connect()
+    conn.execute("""
+        INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (st.session_state["usuario"], desc, categoria, centro, valor, ",".join(lista)))
+
+    conn.commit()
+    conn.close()
+
+    st.markdown('<div class="success-check">✔ Enviado com sucesso!</div>', unsafe_allow_html=True)
+    st.balloons()
+    st.rerun()
+    lista = []
+
+    if arquivos:
                 for arq in arquivos:
                     nome = f"{datetime.now().timestamp()}_{arq.name}"
                     caminho = os.path.join("uploads", nome)
@@ -275,15 +338,15 @@ elif menu == "despesas":
 
                     lista.append(caminho)
 
-            conn = connect()
-            conn.execute("""
+    conn = connect()
+    conn.execute("""
             INSERT INTO despesas (usuario, descricao, categoria, centro_custo, valor, arquivos)
             VALUES (?, ?, ?, ?, ?, ?)
             """, (st.session_state["usuario"], desc, categoria, centro, valor, ",".join(lista)))
-            conn.commit()
-            conn.close()
+    conn.commit()
+    conn.close()
 
-            st.success("Enviado!")
+    st.success("Enviado!")
 
     with tab2:
         conn = connect()
@@ -299,11 +362,118 @@ elif menu == "despesas":
 # =========================
 elif menu == "reembolsos":
 
+    if st.session_state["tipo"] not in ["admin", "financeiro", "operacional"]:
+        st.warning("Sem permissão")
+        st.stop()
+
     conn = connect()
-    df = pd.read_sql("SELECT * FROM despesas", conn)
+    df = pd.read_sql("SELECT * FROM despesas ORDER BY id DESC", conn)
 
-    for _, row in df.iterrows():
+    for i, row in df.iterrows():
 
-        st.write(f"{row['descricao']} - {row['status']}")
+        status = row["status"]
+
+        classe = {
+            "PENDENTE": "status-pendente",
+            "APROVADO": "status-aprovado",
+            "PAGO": "status-pago",
+            "REJEITADO": "status-rejeitado"
+        }.get(status, "status")
+
+        cor_valor = "valor-positivo" if status == "PAGO" else "valor-negativo"
+
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+
+        # HEADER
+        st.markdown(f"""
+        <div style="display:flex; justify-content:space-between;">
+            <div>👤 <b>{row['usuario']}</b></div>
+            <div class="status {classe}">{status}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # INFO
+        st.markdown(f"""
+        <div style="margin-top:8px;">
+            📄 {row['descricao']}
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div class="valor {cor_valor}">
+            💰 R$ {row['valor']}
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.caption(f"📅 Criado: {row['data_criacao']}")
+        st.caption(f"💸 Pago: {row['data_pagamento']}")
+
+        # 📎 ARQUIVOS
+        if row["arquivos"]:
+            arquivos = row["arquivos"].split(",")
+
+            for arq in arquivos:
+                if os.path.exists(arq):
+
+                    if arq.endswith(".pdf"):
+                        with open(arq, "rb") as f:
+                            st.download_button(
+                                "📄 PDF",
+                                f,
+                                file_name=os.path.basename(arq),
+                                key=f"pdf_{row['id']}_{i}"
+                            )
+
+                    elif arq.endswith((".png",".jpg",".jpeg")):
+                        st.image(arq, width=200)
+
+                    else:
+                        with open(arq, "rb") as f:
+                            st.download_button(
+                                "📎 Arquivo",
+                                f,
+                                file_name=os.path.basename(arq),
+                                key=f"file_{row['id']}_{i}"
+                            )
+
+        col1, col2, col3 = st.columns(3)
+
+        # ✅ APROVAR
+        if col1.button("Aprovar", key=f"ap_{row['id']}_{i}"):
+            conn.execute("UPDATE despesas SET status='APROVADO' WHERE id=?", (row["id"],))
+            conn.commit()
+            st.rerun()
+
+        # ❌ REJEITAR
+        if col2.button("Rejeitar", key=f"rej_{row['id']}_{i}"):
+            conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?", (row["id"],))
+            conn.commit()
+            st.rerun()
+
+        # 💰 PAGAR
+        if col3.button("Pagar", key=f"pg_{row['id']}_{i}"):
+
+            c = conn.cursor()
+            c.execute("SELECT nome, email FROM usuarios WHERE usuario=?", (row["usuario"],))
+            user_data = c.fetchone()
+
+            if user_data:
+                nome, email = user_data
+                enviar_email(email, nome, row["descricao"], row["valor"], row["categoria"])
+
+            conn.execute("""
+                UPDATE despesas 
+                SET status='PAGO', data_pagamento=? 
+                WHERE id=?
+            """, (datetime.now(), row["id"]))
+
+            conn.commit()
+
+            st.success("💸 Pago com sucesso + Email enviado!")
+            st.balloons()
+
+            st.rerun()
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     conn.close()
