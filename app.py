@@ -200,18 +200,19 @@ def criar_admins():
     c = conn.cursor()
 
     usuarios = [
-        ("Admin","admin","admin@email.com","123456","admin"),
-        ("Financeiro","financeiro","financeiro@email.com","123456","financeiro"),
-        ("Operacional","operacional","operacional@email.com","123456","operacional")
+        ("Admin","admin","admin@email.com","11999999999","00000000000","123456","admin"),
+        ("Financeiro","financeiro","financeiro@email.com","11999999999","00000000000","123456","financeiro"),
+        ("Operacional","operacional","operacional@email.com","11999999999","00000000000","123456","operacional")
     ]
 
-    for nome, user, email, senha, tipo in usuarios:
+    for nome, user, email, tel, cpf, senha, tipo in usuarios:
         hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
         try:
-            conn.execute("""
-        INSERT INTO usuarios (nome, usuario, email, telefone, cpf, senha, tipo)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (nome, user, email, telefone, cpf, hash, "usuario"))
+            c.execute("""
+                INSERT INTO usuarios 
+                (nome, usuario, email, telefone, cpf, senha, tipo)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (nome, user, email, tel, cpf, hash, tipo))
         except:
             pass
 
