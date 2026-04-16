@@ -165,15 +165,17 @@ def criar_tabelas():
     c = conn.cursor()
 
     c.execute("""
-    CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT,
-        usuario TEXT UNIQUE,
-        email TEXT,
-        senha TEXT,
-        tipo TEXT
-    )
-    """)
+CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT,
+    usuario TEXT UNIQUE,
+    email TEXT,
+    telefone TEXT,
+    cpf TEXT,
+    senha TEXT,
+    tipo TEXT
+)
+""")
 
     c.execute("""
     CREATE TABLE IF NOT EXISTS despesas (
@@ -206,8 +208,10 @@ def criar_admins():
     for nome, user, email, senha, tipo in usuarios:
         hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
         try:
-            c.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?, ?, ?)",
-                      (nome, user, email, hash, tipo))
+            conn.execute("""
+        INSERT INTO usuarios (nome, usuario, email, telefone, cpf, senha, tipo)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (nome, user, email, telefone, cpf, hash, "usuario"))
         except:
             pass
 
@@ -261,6 +265,8 @@ if not st.session_state["logado"]:
         nome = st.text_input("Nome", key="cad_nome")
         user = st.text_input("Usuário", key="cad_user")
         email = st.text_input("Email", key="cad_email")
+        telefone = st.text_input("Telefone (com DDD)", key="cad_tel")
+        cpf = st.text_input("CPF", key="cad_cpf")
         senha = st.text_input("Senha", type="password", key="cad_pass")
 
         if st.button("Criar Conta"):
@@ -548,8 +554,7 @@ elif menu == "reembolsos":
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
         st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
-        st.write(f"📅 Criado: {row['data_criacao']}")
-        st.write(f"🏢 Centro de Custo: {row['centro_custo']}")
+        st.write(f"📅 {row['data_criacao']}")
 
         # =========================
         # 📎 ARQUIVOS
@@ -560,22 +565,25 @@ elif menu == "reembolsos":
             for i, arq in enumerate(arquivos):
                 if os.path.exists(arq):
 
-                    if arq.lower().endswith(".pdf"):
+                    # 🖼️ IMAGEM
+                    if arq.lower().endswith((".png", ".jpg", ".jpeg")):
+                        st.image(arq, width=200)
+
+                    # 📄 PDF
+                    elif arq.lower().endswith(".pdf"):
                         with open(arq, "rb") as f:
                             st.download_button(
-                                "📄 PDF",
+                                "📄 Baixar PDF",
                                 f,
                                 file_name=os.path.basename(arq),
                                 key=f"pdf_{row['id']}_{i}"
                             )
 
-                    elif arq.lower().endswith((".png", ".jpg", ".jpeg")):
-                        st.image(arq, width=200)
-
+                    # 📎 OUTROS
                     else:
                         with open(arq, "rb") as f:
                             st.download_button(
-                                "📎 Arquivo",
+                                "📎 Baixar arquivo",
                                 f,
                                 file_name=os.path.basename(arq),
                                 key=f"file_{row['id']}_{i}"
@@ -584,7 +592,7 @@ elif menu == "reembolsos":
         # =========================
         # 🔥 BOTÕES
         # =========================
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
 
         # ✅ APROVAR
         if col1.button("✅ Aprovar", key=f"ap_{row['id']}"):
@@ -607,20 +615,26 @@ elif menu == "reembolsos":
         # 💰 PAGAR + EMAIL
         if col3.button("💰 Pagar", key=f"pg_{row['id']}"):
 
-            # 🔥 BUSCA USUÁRIO
+            if row["status"] == "PAGO":
+                st.warning("Já foi pago!")
+                st.stop()
+
+            # 🔥 BUSCAR USUÁRIO
             c = conn.cursor()
-            c.execute(
-                "SELECT nome, email FROM usuarios WHERE usuario=?",
-                (row["usuario"],)
-            )
+            c.execute("""
+                SELECT nome, email, telefone 
+                FROM usuarios 
+                WHERE usuario=?
+            """, (row["usuario"],))
+
             user_data = c.fetchone()
 
             if user_data:
-                nome, email = user_data
+                nome = user_data[0]
+                email = user_data[1]
+                telefone = user_data[2]
 
-                data_pagamento = datetime.now().strftime("%d/%m/%Y %H:%M")
-
-                # 🔥 ENVIA EMAIL
+                # 📧 EMAIL
                 enviar_email(
                     email,
                     nome,
@@ -628,6 +642,9 @@ elif menu == "reembolsos":
                     row["valor"],
                     row["categoria"]
                 )
+
+                # 📲 (FUTURO WHATSAPP)
+                # enviar_whatsapp(telefone, nome, row["valor"])
 
             # 🔥 ATUALIZA STATUS
             conn.execute("""
@@ -644,6 +661,13 @@ elif menu == "reembolsos":
             )
 
             st.balloons()
+            st.rerun()
+
+        # 🗑️ EXCLUIR
+        if col4.button("🗑️ Excluir", key=f"del_{row['id']}"):
+            conn.execute("DELETE FROM despesas WHERE id=?", (row["id"],))
+            conn.commit()
+            st.warning("Despesa excluída!")
             st.rerun()
 
         st.markdown('</div>', unsafe_allow_html=True)
