@@ -548,25 +548,28 @@ elif menu == "reembolsos":
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
         st.write(f"👤 {row['usuario']} | 💰 R$ {row['valor']} | 📌 {row['status']}")
-        st.write(f"📅 {row['data_criacao']}")
+        st.write(f"📅 Criado: {row['data_criacao']}")
+        st.write(f"🏢 Centro de Custo: {row['centro_custo']}")
 
-        # ✅ ARQUIVOS (AGORA CERTO)
+        # =========================
+        # 📎 ARQUIVOS
+        # =========================
         if row["arquivos"]:
             arquivos = row["arquivos"].split(",")
 
-            for arq in arquivos:
+            for i, arq in enumerate(arquivos):
                 if os.path.exists(arq):
 
-                    if arq.endswith(".pdf"):
+                    if arq.lower().endswith(".pdf"):
                         with open(arq, "rb") as f:
                             st.download_button(
                                 "📄 PDF",
                                 f,
                                 file_name=os.path.basename(arq),
-                                key=f"pdf_{row['id']}_{arq}"
+                                key=f"pdf_{row['id']}_{i}"
                             )
 
-                    elif arq.endswith((".png", ".jpg", ".jpeg")):
+                    elif arq.lower().endswith((".png", ".jpg", ".jpeg")):
                         st.image(arq, width=200)
 
                     else:
@@ -575,50 +578,74 @@ elif menu == "reembolsos":
                                 "📎 Arquivo",
                                 f,
                                 file_name=os.path.basename(arq),
-                                key=f"file_{row['id']}_{arq}"
+                                key=f"file_{row['id']}_{i}"
                             )
 
+        # =========================
+        # 🔥 BOTÕES
+        # =========================
         col1, col2, col3 = st.columns(3)
 
+        # ✅ APROVAR
         if col1.button("✅ Aprovar", key=f"ap_{row['id']}"):
-            conn.execute("UPDATE despesas SET status='APROVADO' WHERE id=?", (row["id"],))
+            conn.execute(
+                "UPDATE despesas SET status='APROVADO' WHERE id=?",
+                (row["id"],)
+            )
             conn.commit()
             st.rerun()
 
+        # ❌ REJEITAR
         if col2.button("❌ Rejeitar", key=f"rej_{row['id']}"):
-            conn.execute("UPDATE despesas SET status='REJEITADO' WHERE id=?", (row["id"],))
+            conn.execute(
+                "UPDATE despesas SET status='REJEITADO' WHERE id=?",
+                (row["id"],)
+            )
             conn.commit()
             st.rerun()
 
+        # 💰 PAGAR + EMAIL
         if col3.button("💰 Pagar", key=f"pg_{row['id']}"):
 
-                c = conn.cursor()
-    c.execute("SELECT nome, email FROM usuarios WHERE usuario=?", (row["usuario"],))
-    user_data = c.fetchone()
+            # 🔥 BUSCA USUÁRIO
+            c = conn.cursor()
+            c.execute(
+                "SELECT nome, email FROM usuarios WHERE usuario=?",
+                (row["usuario"],)
+            )
+            user_data = c.fetchone()
 
-    if user_data:
-        nome, email = user_data
+            if user_data:
+                nome, email = user_data
 
-        data_pagamento = datetime.now().strftime("%d/%m/%Y %H:%M")
+                data_pagamento = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-        enviar_email(
-            email,
-            nome,
-            row["descricao"],
-            row["valor"],
-            row["categoria"],
-            row["centro_custo"],
-            data_pagamento
-        )
+                # 🔥 ENVIA EMAIL
+                enviar_email(
+                    email,
+                    nome,
+                    row["descricao"],
+                    row["valor"],
+                    row["categoria"]
+                )
 
-    conn.execute("UPDATE despesas SET status='PAGO', data_pagamento=? WHERE id=?",
-                 (datetime.now(), row["id"]))
-    conn.commit()
+            # 🔥 ATUALIZA STATUS
+            conn.execute("""
+                UPDATE despesas 
+                SET status='PAGO', data_pagamento=? 
+                WHERE id=?
+            """, (datetime.now(), row["id"]))
 
-    st.success("Pago + Email enviado!")
-    st.balloons()
-    st.rerun()
+            conn.commit()
 
-    st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="success-check">💰 Pago com sucesso!</div>',
+                unsafe_allow_html=True
+            )
+
+            st.balloons()
+            st.rerun()
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     conn.close()
