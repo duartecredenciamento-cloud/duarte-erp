@@ -231,11 +231,18 @@ def verificar_senha(senha, hash):
 def login(user, senha):
     conn = connect()
     c = conn.cursor()
+
     c.execute("SELECT * FROM usuarios WHERE usuario=?", (user,))
     r = c.fetchone()
+
     conn.close()
-    if r and verificar_senha(senha, r[4]):
-        return r
+
+    if r:
+        senha_hash = r[6]  # 👈 CONFIRMA POSIÇÃO
+
+        if senha_hash and verificar_senha(senha, senha_hash):
+            return r
+
     return None
 
 if "logado" not in st.session_state:
@@ -255,32 +262,41 @@ if not st.session_state["logado"]:
         if st.button("Entrar"):
             r = login(user, senha)
             if r:
+
                 st.session_state["logado"] = True
                 st.session_state["usuario"] = r[2]
-                st.session_state["tipo"] = r[5]
                 st.session_state["nome"] = r[1]
                 st.session_state["email"] = r[3]
+                st.session_state["tipo"] = r[7]
                 st.rerun()
 
     with abas[1]:
-        nome = st.text_input("Nome", key="cad_nome")
-        user = st.text_input("Usuário", key="cad_user")
-        email = st.text_input("Email", key="cad_email")
-        telefone = st.text_input("Telefone (com DDD)", key="cad_tel")
-        cpf = st.text_input("CPF", key="cad_cpf")
-        senha = st.text_input("Senha", type="password", key="cad_pass")
+    
+    nome = st.text_input("Nome", key="cad_nome")
+    user = st.text_input("Usuário", key="cad_user")
+    email = st.text_input("Email", key="cad_email")
+    telefone = st.text_input("Telefone", key="cad_tel")
+    cpf = st.text_input("CPF", key="cad_cpf")
+    senha = st.text_input("Senha", type="password", key="cad_pass")
 
-        if st.button("Criar Conta"):
-            conn = connect()
-            try:
-                hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
-                conn.execute("INSERT INTO usuarios VALUES (NULL, ?, ?, ?, ?, ?)",
-                             (nome, user, email, hash, "usuario"))
-                conn.commit()
-                st.success("Conta criada!")
-            except:
-                st.error("Erro ao criar")
-            conn.close()
+    if st.button("Criar Conta"):
+        conn = connect()
+        try:
+            hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
+
+            conn.execute("""
+                INSERT INTO usuarios 
+                (nome, usuario, email, telefone, cpf, senha, tipo)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (nome, user, email, telefone, cpf, hash, "usuario"))
+
+            conn.commit()
+            st.success("Conta criada!")
+
+        except Exception as e:
+            st.error(f"Erro: {e}")
+
+        conn.close()
 
     st.stop()
 
