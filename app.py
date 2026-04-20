@@ -271,8 +271,8 @@ if not st.session_state["logado"]:
                 st.rerun()
 
     with abas[1]:
-    
-    nome = st.text_input("Nome", key="cad_nome")
+
+     nome = st.text_input("Nome", key="cad_nome")
     user = st.text_input("Usuário", key="cad_user")
     email = st.text_input("Email", key="cad_email")
     telefone = st.text_input("Telefone", key="cad_tel")
@@ -304,7 +304,7 @@ if not st.session_state["logado"]:
 # MENU
 # =========================
 menu = st.sidebar.radio(
-    "",
+    "Menu",
     ["dashboard", "despesas", "reembolsos"],
     format_func=lambda x: {
         "dashboard": "📊 Dashboard",
@@ -652,13 +652,17 @@ elif menu == "reembolsos":
                 telefone = user_data[2]
 
                 # 📧 EMAIL
-                enviar_email(
-                    email,
-                    nome,
-                    row["descricao"],
-                    row["valor"],
-                    row["categoria"]
-                )
+                data_pagamento = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+            enviar_email(
+               email,
+               nome,
+               row["descricao"],
+               row["valor"],
+               row["categoria"],
+            row["centro_custo"],
+               data_pagamento
+)
 
                 # 📲 (FUTURO WHATSAPP)
                 # enviar_whatsapp(telefone, nome, row["valor"])
